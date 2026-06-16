@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "628441589377",
+    "project_id": "nadacilik-79969",
+    "storage_bucket": "nadacilik-79969.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:628441589377:android:02cf8c559cfbc523a20f80",
+        "android_client_info": {
+          "package_name": "com.example.projectuas"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBPJf83Vd0WC6EAnWY988D3PepikHgyjoo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
