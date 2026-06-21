@@ -302,6 +302,8 @@ class _EdukasiPageState extends State<EdukasiPage> {
                                     ),
                                     title: Text(
                                       lagu['judul'] ?? '',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                       style: const TextStyle(
                                         fontWeight: FontWeight.w600,
                                         fontSize: 14,
@@ -309,6 +311,8 @@ class _EdukasiPageState extends State<EdukasiPage> {
                                     ),
                                     subtitle: Text(
                                       lagu['artis'] ?? '',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                       style: TextStyle(
                                         fontSize: 12,
                                         color: Colors.grey[600],

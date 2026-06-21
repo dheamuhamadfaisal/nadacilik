@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'firebase_options.dart';
 import 'pages/login_page.dart';
 import 'pages/home_page.dart';
+import 'pages/sleep_listener_wrapper.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -54,7 +55,9 @@ class _MyAppState extends State<MyApp> {
     }
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      home: isLogin ? const HomePage() : const LoginPage(),
+      home: SleepListenerWrapper(
+        child: isLogin ? const HomePage() : const LoginPage(),
+      ),
     );
   }
 }

@@ -16,7 +16,6 @@ class _SleepPageState extends State<SleepPage> {
   late Timer _jamTimer;
   DateTime _now = DateTime.now();
 
-  // ✅ Ambil state dari singleton
   bool get _waktuTidurAktif => SleepManager.instance.aktif;
   int get _sisaDetik => SleepManager.instance.sisaDetik;
   int get _menitOtomatis => SleepManager.instance.menitOtomatis;
@@ -29,23 +28,24 @@ class _SleepPageState extends State<SleepPage> {
       if (mounted) setState(() => _now = DateTime.now());
     });
 
-    // ✅ Daftarkan callback agar UI update setiap detik
-    SleepManager.instance.onTick = () {
-      if (mounted) setState(() {});
-    };
+    //Pakai addOnTick / addOnWaktuHabis (list of listeners)
+    SleepManager.instance.addOnTick(_onTick);
+    SleepManager.instance.addOnWaktuHabis(_onWaktuHabisLokal);
+  }
 
-    // ✅ Daftarkan callback saat waktu habis
-    SleepManager.instance.onWaktuHabis = () {
-      _tutupAplikasi();
-    };
+  void _onTick() {
+    if (mounted) setState(() {});
+  }
+
+  void _onWaktuHabisLokal() {
+    _tutupAplikasi();
   }
 
   @override
   void dispose() {
     _jamTimer.cancel();
-    // ✅ Hapus callback agar tidak memanggil widget yang sudah di-dispose
-    SleepManager.instance.onTick = null;
-    SleepManager.instance.onWaktuHabis = null;
+    SleepManager.instance.removeOnTick(_onTick);
+    SleepManager.instance.removeOnWaktuHabis(_onWaktuHabisLokal);
     super.dispose();
   }
 
@@ -88,7 +88,7 @@ class _SleepPageState extends State<SleepPage> {
 
     showTopNotif(
       context,
-      message: 'Waktu habis! Sampai jumpa 👋',
+      message: 'Waktu habis! Sampai jumpa',
       backgroundColor: Colors.indigo,
       displayDuration: const Duration(seconds: 2),
     );
@@ -120,7 +120,8 @@ class _SleepPageState extends State<SleepPage> {
       ),
     );
     if (pilihan != null) {
-      setState(() => SleepManager.instance.menitOtomatis = pilihan);
+      SleepManager.instance.menitOtomatis = pilihan;
+      setState(() {});
     }
   }
 
