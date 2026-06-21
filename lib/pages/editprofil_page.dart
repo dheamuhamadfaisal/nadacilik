@@ -17,8 +17,7 @@ class _EditProfilPageState extends State<EditProfilPage> {
 
   String? usernameError;
   String? passwordError;
-  String? confirmPasswordError;
-
+  String? confirmPasswordError;  
   bool isLoading = false;
   String oldUsername = '';
 

@@ -1,6 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:projectuas/pages/snackbar_helper.dart';
+import 'package:projectuas/pages/audio_manager.dart';
+import 'package:projectuas/pages/sleep_manager.dart';
 
 class SleepPage extends StatefulWidget {
   const SleepPage({super.key});
@@ -10,25 +13,39 @@ class SleepPage extends StatefulWidget {
 }
 
 class _SleepPageState extends State<SleepPage> {
-  late Timer _timer;
+  late Timer _jamTimer;
   DateTime _now = DateTime.now();
-  bool _waktuTidurAktif = false;
-  int _menitOtomatis = 30;
+
+  // ✅ Ambil state dari singleton
+  bool get _waktuTidurAktif => SleepManager.instance.aktif;
+  int get _sisaDetik => SleepManager.instance.sisaDetik;
+  int get _menitOtomatis => SleepManager.instance.menitOtomatis;
 
   @override
   void initState() {
     super.initState();
-    // Update jam setiap detik
-    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      setState(() {
-        _now = DateTime.now();
-      });
+
+    _jamTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() => _now = DateTime.now());
     });
+
+    // ✅ Daftarkan callback agar UI update setiap detik
+    SleepManager.instance.onTick = () {
+      if (mounted) setState(() {});
+    };
+
+    // ✅ Daftarkan callback saat waktu habis
+    SleepManager.instance.onWaktuHabis = () {
+      _tutupAplikasi();
+    };
   }
 
   @override
   void dispose() {
-    _timer.cancel();
+    _jamTimer.cancel();
+    // ✅ Hapus callback agar tidak memanggil widget yang sudah di-dispose
+    SleepManager.instance.onTick = null;
+    SleepManager.instance.onWaktuHabis = null;
     super.dispose();
   }
 
@@ -38,23 +55,63 @@ class _SleepPageState extends State<SleepPage> {
     return '$jam:$menit';
   }
 
+  String _formatCountdown(int detik) {
+    final m = (detik ~/ 60).toString().padLeft(2, '0');
+    final s = (detik % 60).toString().padLeft(2, '0');
+    return '$m:$s';
+  }
+
   void _toggleWaktuTidur(bool value) {
-    setState(() => _waktuTidurAktif = value);
     if (value) {
+      SleepManager.instance.mulai(_menitOtomatis);
+      setState(() {});
       showTopNotif(
         context,
-        message: 'Waktu tidur aktif - matikan otomatis $_menitOtomatis menit',
+        message: 'Waktu tidur aktif — tutup otomatis $_menitOtomatis menit lagi',
         backgroundColor: Colors.indigo,
+      );
+    } else {
+      SleepManager.instance.berhenti();
+      setState(() {});
+      showTopNotif(
+        context,
+        message: 'Waktu tidur dimatikan',
+        backgroundColor: Colors.grey,
       );
     }
   }
 
+  Future<void> _tutupAplikasi() async {
+    if (!mounted) return;
+
+    await AudioManager.instance.player.stop();
+
+    showTopNotif(
+      context,
+      message: 'Waktu habis! Sampai jumpa 👋',
+      backgroundColor: Colors.indigo,
+      displayDuration: const Duration(seconds: 2),
+    );
+
+    await Future.delayed(const Duration(seconds: 2));
+    SystemNavigator.pop();
+  }
+
   void _pilihMenit() async {
+    if (_waktuTidurAktif) {
+      showTopNotif(
+        context,
+        message: 'Matikan waktu tidur dulu untuk mengubah durasi',
+        backgroundColor: Colors.orange,
+      );
+      return;
+    }
+
     final pilihan = await showDialog<int>(
       context: context,
       builder: (context) => SimpleDialog(
         title: const Text('Matikan otomatis setelah'),
-        children: [15, 30, 45, 60].map((menit) {
+        children: [1, 15, 30, 45, 60].map((menit) {
           return SimpleDialogOption(
             onPressed: () => Navigator.pop(context, menit),
             child: Text('$menit menit'),
@@ -63,7 +120,7 @@ class _SleepPageState extends State<SleepPage> {
       ),
     );
     if (pilihan != null) {
-      setState(() => _menitOtomatis = pilihan);
+      setState(() => SleepManager.instance.menitOtomatis = pilihan);
     }
   }
 
@@ -116,14 +173,13 @@ class _SleepPageState extends State<SleepPage> {
 
                 const SizedBox(height: 20),
 
-                // ── Konten ──
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Column(
                       children: [
 
-                        // ── Kotak Timer Jam ──
+                        // ── Kotak Jam + Countdown ──
                         Container(
                           width: double.infinity,
                           padding: const EdgeInsets.symmetric(
@@ -152,9 +208,7 @@ class _SleepPageState extends State<SleepPage> {
                                   fontWeight: FontWeight.bold,
                                   color: Colors.white,
                                   letterSpacing: 4,
-                                  fontFeatures: [
-                                    FontFeature.tabularFigures(),
-                                  ],
+                                  fontFeatures: [FontFeature.tabularFigures()],
                                 ),
                               ),
                               const SizedBox(height: 8),
@@ -166,13 +220,42 @@ class _SleepPageState extends State<SleepPage> {
                                   letterSpacing: 1,
                                 ),
                               ),
+
+                              if (_waktuTidurAktif) ...[
+                                const SizedBox(height: 16),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 20, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.15),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(Icons.timer_rounded,
+                                          color: Colors.white70, size: 18),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'Tutup dalam ${_formatCountdown(_sisaDetik)}',
+                                        style: const TextStyle(
+                                          fontSize: 16,
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w600,
+                                          fontFeatures: [FontFeature.tabularFigures()],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ],
                           ),
                         ),
 
                         const SizedBox(height: 20),
 
-                        // ── Card Toggle Waktu Tidur ──
+                        // ── Card Toggle ──
                         Container(
                           decoration: BoxDecoration(
                             color: Colors.white.withOpacity(0.95),
@@ -210,10 +293,17 @@ class _SleepPageState extends State<SleepPage> {
                             subtitle: GestureDetector(
                               onTap: _pilihMenit,
                               child: Text(
-                                'Matikan Otomatis: $_menitOtomatis menit',
+                                _waktuTidurAktif
+                                    ? 'Sisa: ${_formatCountdown(_sisaDetik)} — Tap untuk ubah'
+                                    : 'Matikan Otomatis: $_menitOtomatis menit — Tap untuk ubah',
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: Colors.grey[600],
+                                  color: _waktuTidurAktif
+                                      ? Colors.indigo
+                                      : Colors.grey[600],
+                                  fontWeight: _waktuTidurAktif
+                                      ? FontWeight.w600
+                                      : FontWeight.normal,
                                 ),
                               ),
                             ),
@@ -227,7 +317,6 @@ class _SleepPageState extends State<SleepPage> {
 
                         const Spacer(),
 
-                        // ── Footer ──
                         Center(
                           child: Text(
                             '© 2026 Nada Cilik',
@@ -237,7 +326,6 @@ class _SleepPageState extends State<SleepPage> {
                             ),
                           ),
                         ),
-
                         const SizedBox(height: 16),
                       ],
                     ),

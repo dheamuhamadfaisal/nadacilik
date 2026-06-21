@@ -1,15 +1,17 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:projectuas/pages/snackbar_helper.dart';
+import 'audio_manager.dart';
 
 class PlayerPage extends StatefulWidget {
   final String judul;
   final String artis;
   final String audioUrl;
   final String? coverUrl;
-  final List<Map<String, dynamic>> playlist; 
-  final int currentIndex;                     
+  final List<Map<String, dynamic>> playlist;
+  final int currentIndex;
 
   const PlayerPage({
     super.key,
@@ -17,8 +19,8 @@ class PlayerPage extends StatefulWidget {
     required this.artis,
     required this.audioUrl,
     this.coverUrl,
-    this.playlist = const [],  // ✅ default kosong
-    this.currentIndex = 0,     // ✅ default 0
+    this.playlist = const [],
+    this.currentIndex = 0,
   });
 
   @override
@@ -26,7 +28,8 @@ class PlayerPage extends StatefulWidget {
 }
 
 class _PlayerPageState extends State<PlayerPage> {
-  final AudioPlayer _player = AudioPlayer();
+  AudioPlayer get _player => AudioManager.instance.player;
+
   bool isLoading = true;
   bool isPlaying = false;
   Duration _duration = Duration.zero;
@@ -37,6 +40,10 @@ class _PlayerPageState extends State<PlayerPage> {
   late String _audioUrl;
   late String? _coverUrl;
   late int _currentIndex;
+
+  StreamSubscription? _durationSub;
+  StreamSubscription? _positionSub;
+  StreamSubscription? _playingSub;
 
   @override
   void initState() {
@@ -50,27 +57,126 @@ class _PlayerPageState extends State<PlayerPage> {
   }
 
   Future<void> _initPlayer() async {
-    setState(() => isLoading = true);
-    try {
-      await _player.setUrl(_audioUrl);
-      setState(() => isLoading = false);
+    // Cancel semua subscription lama terlebih dahulu
+    await _durationSub?.cancel();
+    await _positionSub?.cancel();
+    await _playingSub?.cancel();
 
-      _player.durationStream.listen((d) {
+    try {
+      // ── FIX BUG 1: Cek apakah lagu yang sama sedang berjalan ──
+      // Jika URL sama & audio sudah aktif → jangan reset, sync UI saja
+      final isSameUrl = AudioManager.instance.currentUrl == _audioUrl;
+      final isAlreadyActive =
+          isSameUrl && (_player.playing || _player.position > Duration.zero);
+
+      if (isAlreadyActive) {
+        // Lanjutkan lagu yang sedang berjalan, hanya sync state UI
+        if (mounted) {
+          setState(() {
+            isLoading = false;
+            isPlaying = _player.playing;
+            _duration = _player.duration ?? Duration.zero;
+            _position = _player.position;
+          });
+        }
+      } else {
+        // Lagu baru atau belum pernah diputar → load ulang
+        if (mounted) setState(() => isLoading = true);
+
+        // Catat URL aktif ke AudioManager SEBELUM setUrl
+        AudioManager.instance.currentUrl = _audioUrl;
+
+        await _player.stop();
+        await _player.setUrl(_audioUrl);
+
+        if (mounted) setState(() => isLoading = false);
+
+        _player.play();
+      }
+
+      // Pasang stream listener (selalu dipasang ulang setiap masuk halaman)
+      _durationSub = _player.durationStream.listen((d) {
         if (mounted) setState(() => _duration = d ?? Duration.zero);
       });
 
-      _player.positionStream.listen((p) {
+      _positionSub = _player.positionStream.listen((p) {
         if (mounted) setState(() => _position = p);
       });
 
-      _player.playingStream.listen((playing) {
+      _playingSub = _player.playingStream.listen((playing) {
+        if (mounted) setState(() => isPlaying = playing);
+      });
+    } catch (e) {
+      if (mounted) {
+        setState(() => isLoading = false);
+        showTopNotif(
+          context,
+          message: 'Gagal memuat audio: $e',
+          backgroundColor: Colors.red,
+        );
+      }
+    }
+  }
+
+  // ── FIX BUG 2: Ganti lagu tanpa race condition ──
+  Future<void> _changeLagu(int newIndex) async {
+    if (widget.playlist.isEmpty) return;
+    if (newIndex < 0 || newIndex >= widget.playlist.length) return;
+
+    final lagu = widget.playlist[newIndex];
+
+    // Simpan semua nilai ke variabel lokal SEBELUM setState
+    final newUrl = lagu['audio_url'] ?? '';
+    final newJudul = lagu['judul'] ?? '';
+    final newArtis = lagu['artis'] ?? '';
+    final newCover = lagu['cover_url'];
+
+    // Cancel subscription lama sebelum ganti lagu
+    await _durationSub?.cancel();
+    await _positionSub?.cancel();
+    await _playingSub?.cancel();
+
+    if (mounted) {
+      setState(() {
+        _currentIndex = newIndex;
+        _judul = newJudul;
+        _artis = newArtis;
+        _audioUrl = newUrl;
+        _coverUrl = newCover;
+        isLoading = true;
+        _position = Duration.zero;
+        _duration = Duration.zero;
+      });
+    }
+
+    try {
+      // Update AudioManager dengan URL baru
+      AudioManager.instance.currentUrl = newUrl;
+
+      await _player.stop();
+
+      // Gunakan newUrl (variabel lokal)
+      await _player.setUrl(newUrl);
+
+      if (mounted) setState(() => isLoading = false);
+
+      // Pasang ulang stream listener
+      _durationSub = _player.durationStream.listen((d) {
+        if (mounted) setState(() => _duration = d ?? Duration.zero);
+      });
+
+      _positionSub = _player.positionStream.listen((p) {
+        if (mounted) setState(() => _position = p);
+      });
+
+      _playingSub = _player.playingStream.listen((playing) {
         if (mounted) setState(() => isPlaying = playing);
       });
 
       _player.play();
     } catch (e) {
-      setState(() => isLoading = false);
       if (mounted) {
+        setState(() => isLoading = false);
         showTopNotif(
           context,
           message: 'Gagal memuat audio: $e',
@@ -82,7 +188,9 @@ class _PlayerPageState extends State<PlayerPage> {
 
   @override
   void dispose() {
-    _player.dispose();
+    _durationSub?.cancel();
+    _positionSub?.cancel();
+    _playingSub?.cancel();
     super.dispose();
   }
 
@@ -100,30 +208,8 @@ class _PlayerPageState extends State<PlayerPage> {
     isPlaying ? _player.pause() : _player.play();
   }
 
-  // ✅ Fungsi ganti lagu
-  Future<void> _changeLagu(int newIndex) async {
-    if (widget.playlist.isEmpty) return;
-    if (newIndex < 0 || newIndex >= widget.playlist.length) return;
-
-    final lagu = widget.playlist[newIndex];
-    setState(() {
-      _currentIndex = newIndex;
-      _judul = lagu['judul'] ?? '';
-      _artis = lagu['artis'] ?? '';
-      _audioUrl = lagu['audio_url'] ?? '';
-      _coverUrl = lagu['cover_url'];
-      isLoading = true;
-      _position = Duration.zero;
-      _duration = Duration.zero;
-    });
-
-    await _player.stop();
-    await _initPlayer();
-  }
-
   void _previous() {
     if (widget.playlist.isEmpty) {
-      // Kalau tidak ada playlist, kembali ke awal lagu
       _player.seek(Duration.zero);
     } else {
       _changeLagu(_currentIndex - 1);
@@ -159,7 +245,6 @@ class _PlayerPageState extends State<PlayerPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-
                 // ── AppBar ──
                 Padding(
                   padding: const EdgeInsets.fromLTRB(8, 8, 16, 0),
@@ -167,8 +252,10 @@ class _PlayerPageState extends State<PlayerPage> {
                     children: [
                       IconButton(
                         onPressed: () => Navigator.pop(context),
-                        icon: const Icon(Icons.arrow_back_ios_new_rounded,
-                            color: Colors.white),
+                        icon: const Icon(
+                          Icons.arrow_back_ios_new_rounded,
+                          color: Colors.white,
+                        ),
                       ),
                       const Text(
                         'Sedang Diputar',
@@ -204,7 +291,6 @@ class _PlayerPageState extends State<PlayerPage> {
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-
                               // ── Cover ──
                               Container(
                                 width: 160,
@@ -227,11 +313,12 @@ class _PlayerPageState extends State<PlayerPage> {
                                           fit: BoxFit.cover,
                                           placeholder: (context, url) =>
                                               Container(
-                                            color: Colors.blue[50],
-                                            child: const Center(
-                                              child: CircularProgressIndicator(),
-                                            ),
-                                          ),
+                                                color: Colors.blue[50],
+                                                child: const Center(
+                                                  child:
+                                                      CircularProgressIndicator(),
+                                                ),
+                                              ),
                                           errorWidget: (context, url, error) =>
                                               _coverFallback(),
                                         )
@@ -267,15 +354,18 @@ class _PlayerPageState extends State<PlayerPage> {
                               SliderTheme(
                                 data: SliderTheme.of(context).copyWith(
                                   thumbShape: const RoundSliderThumbShape(
-                                      enabledThumbRadius: 6),
+                                    enabledThumbRadius: 6,
+                                  ),
                                   overlayShape: const RoundSliderOverlayShape(
-                                      overlayRadius: 12),
+                                    overlayRadius: 12,
+                                  ),
                                   trackHeight: 3,
                                 ),
                                 child: Slider(
-                                  value: _position.inSeconds
-                                      .toDouble()
-                                      .clamp(0, _duration.inSeconds.toDouble()),
+                                  value: _position.inSeconds.toDouble().clamp(
+                                    0,
+                                    _duration.inSeconds.toDouble(),
+                                  ),
                                   min: 0,
                                   max: _duration.inSeconds.toDouble() > 0
                                       ? _duration.inSeconds.toDouble()
@@ -288,19 +378,26 @@ class _PlayerPageState extends State<PlayerPage> {
 
                               // ── Waktu ──
                               Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 8),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                ),
                                 child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
                                   children: [
                                     Text(
                                       _formatDurasi(_position),
                                       style: TextStyle(
-                                          fontSize: 12, color: Colors.grey[500]),
+                                        fontSize: 12,
+                                        color: Colors.grey[500],
+                                      ),
                                     ),
                                     Text(
                                       _formatDurasi(_duration),
                                       style: TextStyle(
-                                          fontSize: 12, color: Colors.grey[500]),
+                                        fontSize: 12,
+                                        color: Colors.grey[500],
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -312,7 +409,8 @@ class _PlayerPageState extends State<PlayerPage> {
                               isLoading
                                   ? const CircularProgressIndicator()
                                   : Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
                                       children: [
                                         // Previous
                                         IconButton(
@@ -320,8 +418,9 @@ class _PlayerPageState extends State<PlayerPage> {
                                           icon: Icon(
                                             Icons.skip_previous_rounded,
                                             size: 40,
-                                            // ✅ Abu-abu jika tidak ada playlist
-                                            color: widget.playlist.isEmpty || _currentIndex == 0
+                                            color:
+                                                widget.playlist.isEmpty ||
+                                                    _currentIndex == 0
                                                 ? Colors.grey[400]
                                                 : Colors.black87,
                                           ),
@@ -334,7 +433,9 @@ class _PlayerPageState extends State<PlayerPage> {
                                             shape: BoxShape.circle,
                                             boxShadow: [
                                               BoxShadow(
-                                                color: Colors.blue.withOpacity(0.4),
+                                                color: Colors.blue.withOpacity(
+                                                  0.4,
+                                                ),
                                                 blurRadius: 10,
                                                 offset: const Offset(0, 4),
                                               ),
@@ -358,9 +459,11 @@ class _PlayerPageState extends State<PlayerPage> {
                                           icon: Icon(
                                             Icons.skip_next_rounded,
                                             size: 40,
-                                            // ✅ Abu-abu jika lagu terakhir
-                                            color: widget.playlist.isEmpty ||
-                                                    _currentIndex == widget.playlist.length - 1
+                                            color:
+                                                widget.playlist.isEmpty ||
+                                                    _currentIndex ==
+                                                        widget.playlist.length -
+                                                            1
                                                 ? Colors.grey[400]
                                                 : Colors.black87,
                                           ),
@@ -399,11 +502,7 @@ class _PlayerPageState extends State<PlayerPage> {
   Widget _coverFallback() {
     return Container(
       color: Colors.blue[50],
-      child: const Icon(
-        Icons.music_note_rounded,
-        size: 60,
-        color: Colors.blue,
-      ),
+      child: const Icon(Icons.music_note_rounded, size: 60, color: Colors.blue),
     );
   }
 }

@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 void showTopNotif(
   BuildContext context, {
   required String message,
-  Color backgroundColor = Colors.green,
+  Color backgroundColor = const Color.fromARGB(255, 76, 132, 175),
   Duration displayDuration = const Duration(seconds: 2),
 }) {
   final overlayState = Overlay.of(context, rootOverlay: true);

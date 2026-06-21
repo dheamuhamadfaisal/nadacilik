@@ -149,7 +149,7 @@ class _LoginPageState extends State<LoginPage> {
       showTopNotif(
         context,
         message: 'Registrasi berhasil! Silakan login.',
-        backgroundColor: Colors.green,
+        backgroundColor: const Color.fromARGB(255, 39, 87, 217),
       );
     } catch (e) {
       debugPrint('Error register: $e');
@@ -200,7 +200,7 @@ class _LoginPageState extends State<LoginPage> {
                           ClipRRect(
                             borderRadius: BorderRadiusGeometry.circular(50),
                             child: Image.asset(
-                            'assets/images/logo.jpg', 
+                            'assets/images/logo.jpeg', 
                             width: 120,
                             height: 120,
                             fit: BoxFit.cover,

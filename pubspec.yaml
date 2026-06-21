@@ -70,7 +70,7 @@ flutter:
     - assets/images/sleep_background.jpeg
     - assets/images/pages_background.jpeg
     - assets/images/favorite_background.jpeg
-    - assets/images/logo.jpg
+    - assets/images/logo.jpeg
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

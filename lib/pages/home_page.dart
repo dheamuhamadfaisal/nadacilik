@@ -8,13 +8,12 @@ import 'edukasi_page.dart';
 import 'musik_page.dart';
 import 'player_page.dart';
 import 'editprofil_page.dart';
-// import 'cerita_page.dart'; // ✅ tidak perlu, cerita = edukasi
 
 final List<Map<String, dynamic>> features = [
-  {'icon': Icons.star_rounded, 'label': 'Favorit', 'color': Color(0xFF4CAF50)},
-  {'icon': Icons.nightlight_round, 'label': 'Tidur', 'color': Color(0xFF5C6BC0)},
-  {'icon': Icons.menu_book_rounded, 'label': 'Edukasi', 'color': Color(0xFFFF9800)},
-  {'icon': Icons.music_note_rounded, 'label': 'Musik', 'color': Color(0xFF29B6F6)},
+  {'icon': Icons.star_rounded, 'label': 'Favorit', 'color': const Color(0xFF4CAF50)},
+  {'icon': Icons.nightlight_round, 'label': 'Tidur', 'color': const Color(0xFF5C6BC0)},
+  {'icon': Icons.menu_book_rounded, 'label': 'Edukasi', 'color': const Color(0xFFFF9800)},
+  {'icon': Icons.music_note_rounded, 'label': 'Musik', 'color': const Color(0xFF29B6F6)},
 ];
 
 class HomePage extends StatefulWidget {
@@ -42,15 +41,14 @@ class _HomePageState extends State<HomePage> {
           .get();
 
       final featured = snapshot.docs
-      .where((doc) => doc['featured'] == true)
-      .toList();
+          .where((doc) => doc['featured'] == true)
+          .toList();
 
       if (featured.isNotEmpty) {
         setState(() {
           featuredLagu = featured.first.data();
         });
-        debugPrint('Tidak ada featured');
-    
+        debugPrint('Featured lagu berhasil dimuat.'); // ✅ Diperbaiki agar tidak membingungkan
       } else {
         debugPrint('Tidak ada lagu featured ditemukan.');
       }
@@ -85,7 +83,7 @@ class _HomePageState extends State<HomePage> {
     } else if (label == 'Tidur') {
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => const SleepPage()),
+        MaterialPageRoute(builder: (_) => const SleepPage()), // ✅ Pastikan class di sleep_page.dart bernama 'SleepPage'
       );
     } else if (label == 'Edukasi') {
       Navigator.push(
@@ -101,7 +99,6 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _onCeritaTap() {
-
     if (featuredLagu == null) return;
     Navigator.push(
       context,
@@ -109,8 +106,8 @@ class _HomePageState extends State<HomePage> {
         builder: (_) => PlayerPage(
           judul: featuredLagu!['judul'] ?? 'Lagu Pilihan',      
           artis: featuredLagu!['artis'] ?? '',
-          audioUrl: featuredLagu!['audio_url'] ?? '',           
-          coverUrl: featuredLagu!['cover_url'],                 
+          audioUrl: featuredLagu!['audio_url'] ?? '',          
+          coverUrl: featuredLagu!['cover_url'],                
         ),
       ),
     );
@@ -133,7 +130,6 @@ class _HomePageState extends State<HomePage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-
                 // ── Header ──
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
@@ -231,7 +227,6 @@ class _HomePageState extends State<HomePage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-
                         // ── Label Fitur Utama ──
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -283,7 +278,7 @@ class _HomePageState extends State<HomePage> {
                                   children: [
                                     Icon(
                                       feature['icon'],
-                                      size: 100,
+                                      size: 100, 
                                       color: feature['color'],
                                     ),
                                     const SizedBox(height: 10),
@@ -340,7 +335,6 @@ class _HomePageState extends State<HomePage> {
                                         ),
                                       ),
                                       const SizedBox(height: 4),
-                                      // ✅ Pindah ke luar const children
                                       Text(
                                         featuredLagu != null
                                             ? featuredLagu!['judul'] ?? 'Memuat lagu...'
@@ -361,7 +355,7 @@ class _HomePageState extends State<HomePage> {
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                   child: const Icon(
-                                    Icons.play_circle_rounded, // ✅ ganti icon
+                                    Icons.play_circle_rounded,
                                     color: Colors.white,
                                     size: 32,
                                   ),

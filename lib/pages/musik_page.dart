@@ -101,7 +101,7 @@ class _MusikPageState extends State<MusikPage> {
         showTopNotif(
           context,
           message: '${lagu['judul']} ditambahkan ke Favorit!',
-          backgroundColor: Colors.green,
+          backgroundColor: const Color.fromARGB(255, 39, 87, 217),
         );
       }
     } catch (e) {

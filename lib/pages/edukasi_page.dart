@@ -50,7 +50,7 @@ class _EdukasiPageState extends State<EdukasiPage> {
       debugPrint('Error fetching lagu: $e');
       setState(() => isLoading = false);
       if (mounted) {
-        // ✅ Ganti _showToastAboveSearch dengan showTopNotif
+        // Ganti _showToastAboveSearch dengan showTopNotif
         showTopNotif(
           context,
           message: 'Gagal memuat lagu. Coba lagi nanti.',
@@ -102,13 +102,13 @@ class _EdukasiPageState extends State<EdukasiPage> {
         showTopNotif(
           context,
           message: '${lagu['judul']} ditambahkan ke Favorit!',
-          backgroundColor: Colors.green,
+          backgroundColor:const Color.fromARGB(255, 39, 87, 217),
         );
       }
     } catch (e) {
       debugPrint('Error tambah favorit: $e');
       if (mounted) {
-        // ✅ Ganti _showToastAboveSearch dengan showTopNotif
+        // Ganti _showToastAboveSearch dengan showTopNotif
         showTopNotif(
           context,
           message: 'Gagal menambahkan ke Favorit.',
