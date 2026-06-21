@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:projectuas/pages/snackbar_helper.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:projectuas/pages/connectivity_helper.dart';
 import 'home_page.dart';
 
 class LoginPage extends StatefulWidget {
@@ -33,6 +34,18 @@ class _LoginPageState extends State<LoginPage> {
 
   // Fungsi Login
   Future<void> login() async {
+    final adaKoneksi = await cekKoneksi();
+    if (!adaKoneksi) {
+      if (mounted) {
+        showTopNotif(
+          context,
+          message: 'Tidak ada koneksi internet!',
+          backgroundColor: Colors.red,
+      );
+    }
+    return;
+    }
+
     setState(() {
       usernameError = usernameController.text.isEmpty ? 'Username tidak boleh kosong' : null;
       passwordError = passwordController.text.isEmpty ? 'Password tidak boleh kosong' : null;
@@ -94,6 +107,18 @@ class _LoginPageState extends State<LoginPage> {
 
   // Fungsi Register
   Future<void> register() async {
+    final adaKoneksi = await cekKoneksi();
+    if (!adaKoneksi) {
+      if (mounted) {
+        showTopNotif(
+          context,
+          message: 'Tidak ada koneksi internet!',
+          backgroundColor: Colors.red,
+      );
+    }
+    return;
+    }
+    
     setState(() {
       usernameError = usernameController.text.isEmpty ? 'Username tidak boleh kosong' : null;
       passwordError = passwordController.text.isEmpty ? 'Password tidak boleh kosong' : null;

@@ -274,7 +274,7 @@ class _EditProfilPageState extends State<EditProfilPage> {
                                 SizedBox(
                                   width: double.infinity,
                                   height: 50,
-                                  child: OutlinedButton(
+                                  child: ElevatedButton(
                                     onPressed: isLoading ? null : _simpan,
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: const Color(0xFF4CAF50),

@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:projectuas/pages/snackbar_helper.dart';
 import 'player_page.dart';
+import 'package:projectuas/pages/connectivity_helper.dart';
 
 class EdukasiPage extends StatefulWidget {
   const EdukasiPage({super.key});
@@ -30,6 +31,17 @@ class _EdukasiPageState extends State<EdukasiPage> {
   }
 
   Future<void> _fetchLagu() async {
+    final adaKoneksi = await cekKoneksi();
+    if (!adaKoneksi){
+      if(mounted){
+        showTopNotif(
+          context, 
+          message: 'Tidak Ada Koneksi Internet!',
+        );
+      }
+      return;
+    }
+
     setState(() => isLoading = true);
     try {
       final snapshot = await FirebaseFirestore.instance

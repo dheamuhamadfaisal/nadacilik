@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:projectuas/pages/snackbar_helper.dart';
 import 'package:projectuas/pages/audio_manager.dart';
 import 'package:projectuas/pages/sleep_manager.dart';
+import 'package:projectuas/pages/connectivity_helper.dart';
 
 class SleepPage extends StatefulWidget {
   const SleepPage({super.key});
@@ -61,7 +62,18 @@ class _SleepPageState extends State<SleepPage> {
     return '$m:$s';
   }
 
-  void _toggleWaktuTidur(bool value) {
+  void _toggleWaktuTidur(bool value) async {
+    final adaKoneksi = await cekKoneksi();
+    if (!adaKoneksi) {
+      if (mounted) {
+        showTopNotif(
+          context,
+          message: 'Tidak ada koneksi internet!',
+          backgroundColor: Colors.red,
+      );
+    }
+    return;
+  }
     if (value) {
       SleepManager.instance.mulai(_menitOtomatis);
       setState(() {});

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:projectuas/pages/snackbar_helper.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'login_page.dart';
@@ -8,6 +9,7 @@ import 'edukasi_page.dart';
 import 'musik_page.dart';
 import 'player_page.dart';
 import 'editprofil_page.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 final List<Map<String, dynamic>> features = [
   {'icon': Icons.star_rounded, 'label': 'Favorit', 'color': const Color(0xFF4CAF50)},
@@ -34,7 +36,24 @@ class _HomePageState extends State<HomePage> {
     _fetchFeaturedLagu();
   }
 
+  Future<bool> _cekKoneksi() async {
+    final result = await Connectivity().checkConnectivity();
+    return result != ConnectivityResult.none;
+  }
+
   Future<void> _fetchFeaturedLagu() async {
+    final adaKoneksi = await _cekKoneksi();
+    if (!adaKoneksi){
+      if (mounted){
+        showTopNotif(
+          context, 
+          message: 'Tidak Ada Koneksi Internet!',
+          backgroundColor: Colors.red,
+        );
+      }
+      return;
+    }
+
     try {
       final snapshot = await FirebaseFirestore.instance
           .collection('lagu')
@@ -48,7 +67,7 @@ class _HomePageState extends State<HomePage> {
         setState(() {
           featuredLagu = featured.first.data();
         });
-        debugPrint('Featured lagu berhasil dimuat.'); // ✅ Diperbaiki agar tidak membingungkan
+        debugPrint('Featured lagu berhasil dimuat.'); // Diperbaiki agar tidak membingungkan
       } else {
         debugPrint('Tidak ada lagu featured ditemukan.');
       }
@@ -147,20 +166,30 @@ class _HomePageState extends State<HomePage> {
                               fontWeight: FontWeight.w400,
                             ),
                           ),
-                          Text(
-                            username,
-                            style: const TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                              shadows: [
-                                Shadow(
-                                  blurRadius: 4,
-                                  color: Colors.black38,
-                                  offset: Offset(1, 1),
+                          Row(
+                            children: [
+                              Text(
+                                username,
+                                style: const TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                  shadows: [
+                                    Shadow(
+                                      blurRadius: 4,
+                                      color: Colors.black38,
+                                      offset: Offset(1, 1),
+                                    ),
+                                  ],
                                 ),
-                              ],
-                            ),
+                              ),
+                              const SizedBox(width: 6),
+                              const Icon(
+                                Icons.verified,
+                                color: Colors.blue,
+                                size: 20,
+                              ),
+                            ],
                           ),
                         ],
                       ),

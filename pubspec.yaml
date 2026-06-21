@@ -40,6 +40,8 @@ dependencies:
   firebase_core: ^4.10.0
   cloud_firestore: ^6.5.0
   top_snackbar_flutter: ^3.3.0
+  connectivity_plus: ^7.1.1
+  
   
 
 dev_dependencies:

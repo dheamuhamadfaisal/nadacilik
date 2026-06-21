@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:projectuas/pages/connectivity_helper.dart';
+import 'package:projectuas/pages/snackbar_helper.dart';
 import 'player_page.dart';
 
 class CeritaPage extends StatefulWidget {
@@ -29,6 +31,17 @@ class _CeritaPageState extends State<CeritaPage> {
 
   // ✅ Ganti isi fungsi ini dengan API call kamu
   Future<void> _fetchCerita() async {
+    final adaKoneksi = await cekKoneksi();
+    if (!adaKoneksi){
+      if(mounted){
+        showTopNotif(
+          context, 
+          message: 'Tidak Ada Koneksi Internet!',
+        );
+      }
+      return;
+    }
+
     setState(() => isLoading = true);
 
     // TODO: ganti dengan API call, contoh:
