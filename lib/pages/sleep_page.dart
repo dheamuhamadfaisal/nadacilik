@@ -123,7 +123,7 @@ class _SleepPageState extends State<SleepPage> {
       context: context,
       builder: (context) => SimpleDialog(
         title: const Text('Matikan otomatis setelah'),
-        children: [1, 15, 30, 45, 60].map((menit) {
+        children: [15, 30, 45, 60].map((menit) {
           return SimpleDialogOption(
             onPressed: () => Navigator.pop(context, menit),
             child: Text('$menit menit'),
