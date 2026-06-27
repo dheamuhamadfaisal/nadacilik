@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:projectuas/pages/snackbar_helper.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:projectuas/pages/audio_manager.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:projectuas/pages/connectivity_helper.dart';
+import 'mini_player_widget.dart';
 import 'login_page.dart';
 import 'favorit_page.dart';
 import 'sleep_page.dart';
@@ -9,7 +13,6 @@ import 'edukasi_page.dart';
 import 'musik_page.dart';
 import 'player_page.dart';
 import 'editprofil_page.dart';
-import 'package:connectivity_plus/connectivity_plus.dart';
 
 final List<Map<String, dynamic>> features = [
   {'icon': Icons.star_rounded, 'label': 'Favorit', 'color': const Color(0xFF4CAF50)},
@@ -28,6 +31,7 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   String username = '';
   Map<String, dynamic>? featuredLagu;
+  Map<String, dynamic>? _currentPlayingLagu; // ✅ Untuk mini player
 
   @override
   void initState() {
@@ -36,17 +40,28 @@ class _HomePageState extends State<HomePage> {
     _fetchFeaturedLagu();
   }
 
-  Future<bool> _cekKoneksi() async {
-    final result = await Connectivity().checkConnectivity();
-    return result != ConnectivityResult.none;
+  // ✅ Update mini player setiap kembali ke halaman ini
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _updateMiniPlayer();
+  }
+
+  void _updateMiniPlayer() {
+    final url = AudioManager.instance.currentUrl;
+    if (url == null || url.isEmpty) return;
+
+    if (featuredLagu != null && featuredLagu!['audio_url'] == url) {
+      if (mounted) setState(() => _currentPlayingLagu = featuredLagu);
+    }
   }
 
   Future<void> _fetchFeaturedLagu() async {
-    final adaKoneksi = await _cekKoneksi();
-    if (!adaKoneksi){
-      if (mounted){
+    final adaKoneksi = await cekKoneksi(); // ✅ Pakai connectivity_helper
+    if (!adaKoneksi) {
+      if (mounted) {
         showTopNotif(
-          context, 
+          context,
           message: 'Tidak Ada Koneksi Internet!',
           backgroundColor: Colors.red,
         );
@@ -67,7 +82,7 @@ class _HomePageState extends State<HomePage> {
         setState(() {
           featuredLagu = featured.first.data();
         });
-        debugPrint('Featured lagu berhasil dimuat.'); // Diperbaiki agar tidak membingungkan
+        debugPrint('Featured lagu berhasil dimuat.');
       } else {
         debugPrint('Tidak ada lagu featured ditemukan.');
       }
@@ -95,40 +110,171 @@ class _HomePageState extends State<HomePage> {
 
   void _onFeatureTap(String label) {
     if (label == 'Favorit') {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const FavoritPage()),
-      );
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const FavoritPage()));
     } else if (label == 'Tidur') {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const SleepPage()), // ✅ Pastikan class di sleep_page.dart bernama 'SleepPage'
-      );
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const SleepPage()));
     } else if (label == 'Edukasi') {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const EdukasiPage()),
-      );
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const EdukasiPage()));
     } else if (label == 'Musik') {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const MusikPage()),
-      );
-    } 
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const MusikPage()));
+    }
   }
 
   void _onCeritaTap() {
     if (featuredLagu == null) return;
+    setState(() => _currentPlayingLagu = featuredLagu);
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => PlayerPage(
-          judul: featuredLagu!['judul'] ?? 'Lagu Pilihan',      
+          judul: featuredLagu!['judul'] ?? 'Lagu Pilihan',
           artis: featuredLagu!['artis'] ?? '',
-          audioUrl: featuredLagu!['audio_url'] ?? '',          
-          coverUrl: featuredLagu!['cover_url'],                
+          audioUrl: featuredLagu!['audio_url'] ?? '',
+          coverUrl: featuredLagu!['cover_url'],
         ),
       ),
+    ).then((_) => setState(() {})); // ✅ Refresh mini player saat kembali
+  }
+
+  // ✅ Widget mini player
+  Widget MiniPlayerWid() {
+    final isPlaying = AudioManager.instance.player.playing;
+    final hasPosition = AudioManager.instance.player.position > Duration.zero;
+    final url = AudioManager.instance.currentUrl ?? '';
+
+    if ((!isPlaying && !hasPosition) || url.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final judul = _currentPlayingLagu?['judul'] ?? 'Sedang Diputar';
+    final artis = _currentPlayingLagu?['artis'] ?? '';
+    final coverUrl = _currentPlayingLagu?['cover_url'];
+
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => PlayerPage(
+              judul: judul,
+              artis: artis,
+              audioUrl: url,
+              coverUrl: coverUrl,
+            ),
+          ),
+        ).then((_) => setState(() {})); // ✅ Refresh saat kembali
+      },
+      child: Container(
+        height: 65,
+        margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.15),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            // Cover
+            ClipRRect(
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(16),
+                bottomLeft: Radius.circular(16),
+              ),
+              child: coverUrl != null && coverUrl.toString().isNotEmpty
+                  ? CachedNetworkImage(
+                      imageUrl: coverUrl,
+                      width: 65,
+                      height: 65,
+                      fit: BoxFit.cover,
+                      errorWidget: (_, __, ___) => _miniCoverFallback(),
+                    )
+                  : _miniCoverFallback(),
+            ),
+            const SizedBox(width: 12),
+            // Info lagu
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    judul,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  if (artis.isNotEmpty)
+                    Text(
+                      artis,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            // Kontrol play/pause & stop
+            StreamBuilder(
+              stream: AudioManager.instance.player.playingStream,
+              builder: (context, snapshot) {
+                final playing = snapshot.data ?? false;
+                return Row(
+                  children: [
+                    IconButton(
+                      onPressed: () {
+                        playing
+                            ? AudioManager.instance.player.pause()
+                            : AudioManager.instance.player.play();
+                        setState(() {});
+                      },
+                      icon: Icon(
+                        playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                        size: 28,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () async {
+                        await AudioManager.instance.player.stop();
+                        AudioManager.instance.currentUrl = '';
+                        setState(() => _currentPlayingLagu = null);
+                      },
+                      icon: const Icon(
+                        Icons.stop_rounded,
+                        size: 28,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+            const SizedBox(width: 4),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _miniCoverFallback() {
+    return Container(
+      width: 65,
+      height: 65,
+      color: Colors.blue[100],
+      child: const Icon(Icons.music_note_rounded, color: Colors.blue, size: 30),
     );
   }
 
@@ -136,6 +282,8 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.transparent,
+      extendBody: true,
+      bottomNavigationBar: const MiniPlayerWidget(),
       body: Container(
         decoration: const BoxDecoration(
           image: DecorationImage(
@@ -307,7 +455,7 @@ class _HomePageState extends State<HomePage> {
                                   children: [
                                     Icon(
                                       feature['icon'],
-                                      size: 100, 
+                                      size: 100,
                                       color: feature['color'],
                                     ),
                                     const SizedBox(height: 10),

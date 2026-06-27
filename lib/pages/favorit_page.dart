@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:projectuas/pages/connectivity_helper.dart';
 import 'package:projectuas/pages/snackbar_helper.dart';
+import 'mini_player_widget.dart';
 import 'player_page.dart';
 
 class FavoritPage extends StatefulWidget {
@@ -32,11 +33,12 @@ class _FavoritPageState extends State<FavoritPage> {
 
   Future<void> _fetchLagu() async {
     final adaKoneksi = await cekKoneksi();
-    if (!adaKoneksi){
-      if(mounted){
+    if (!adaKoneksi) {
+      if (mounted) {
         showTopNotif(
-          context, 
+          context,
           message: 'Tidak Ada Koneksi Internet!',
+          backgroundColor: Colors.red,
         );
       }
       return;
@@ -62,7 +64,6 @@ class _FavoritPageState extends State<FavoritPage> {
       debugPrint('Error fetching favorit: $e');
       setState(() => isLoading = false);
       if (mounted) {
-        // ✅ Ganti ScaffoldMessenger dengan showTopNotif
         showTopNotif(
           context,
           message: 'Gagal memuat favorit. Coba lagi nanti.',
@@ -89,6 +90,42 @@ class _FavoritPageState extends State<FavoritPage> {
   }
 
   Future<void> _onHapus(Map<String, dynamic> lagu) async {
+    final konfirmasi = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          'Apakah Anda Ingin\nMenghapus\nLagu dari Favorite?',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        ),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)
+              ),
+            ),
+            child: const Text('Ya', style: TextStyle(color: Colors.white)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, false),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)
+              ),
+            ),
+            child: const Text('Tidak', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+    if (konfirmasi != true) return;
+
     try {
       await FirebaseFirestore.instance
           .collection('favorit')
@@ -117,12 +154,14 @@ class _FavoritPageState extends State<FavoritPage> {
         );
       }
     }
-  }
+  } // ✅ Tutup _onHapus
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.transparent,
+      extendBody: true,
+      bottomNavigationBar: const MiniPlayerWidget(),
       body: Container(
         decoration: const BoxDecoration(
           image: DecorationImage(
@@ -136,7 +175,6 @@ class _FavoritPageState extends State<FavoritPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-
                 // ── AppBar ──
                 Padding(
                   padding: const EdgeInsets.fromLTRB(8, 8, 16, 0),
@@ -208,7 +246,8 @@ class _FavoritPageState extends State<FavoritPage> {
                 Expanded(
                   child: isLoading
                       ? const Center(
-                          child: CircularProgressIndicator(color: Colors.white),
+                          child:
+                              CircularProgressIndicator(color: Colors.white),
                         )
                       : filteredLagu.isEmpty
                           ? Center(
@@ -275,24 +314,30 @@ class _FavoritPageState extends State<FavoritPage> {
                                       height: 46,
                                       decoration: BoxDecoration(
                                         color: Colors.blue[100],
-                                        borderRadius: BorderRadius.circular(10),
+                                        borderRadius:
+                                            BorderRadius.circular(10),
                                       ),
                                       child: ClipRRect(
-                                        borderRadius: BorderRadius.circular(10),
+                                        borderRadius:
+                                            BorderRadius.circular(10),
                                         child: lagu['cover_url'] != null &&
-                                                lagu['cover_url'].toString().isNotEmpty
+                                                lagu['cover_url']
+                                                    .toString()
+                                                    .isNotEmpty
                                             ? CachedNetworkImage(
                                                 imageUrl: lagu['cover_url'],
                                                 fit: BoxFit.cover,
-                                                placeholder: (context, url) => Container(
+                                                placeholder: (context, url) =>
+                                                    Container(
                                                   color: Colors.blue[100],
                                                   child: const Icon(
                                                     Icons.music_note_rounded,
                                                     color: Colors.blue,
                                                   ),
                                                 ),
-                                                errorWidget: (context, url, error) =>
-                                                    Container(
+                                                errorWidget:
+                                                    (context, url, error) =>
+                                                        Container(
                                                   color: Colors.blue[100],
                                                   child: const Icon(
                                                     Icons.music_note_rounded,
@@ -311,6 +356,8 @@ class _FavoritPageState extends State<FavoritPage> {
                                     ),
                                     title: Text(
                                       lagu['judul'] ?? '',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                       style: const TextStyle(
                                         fontWeight: FontWeight.w600,
                                         fontSize: 14,
@@ -318,6 +365,8 @@ class _FavoritPageState extends State<FavoritPage> {
                                     ),
                                     subtitle: Text(
                                       lagu['artis'] ?? '',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                       style: TextStyle(
                                         fontSize: 12,
                                         color: Colors.grey[600],

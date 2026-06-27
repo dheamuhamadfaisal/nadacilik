@@ -1,10 +1,11 @@
-import 'dart:async';
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:projectuas/pages/mini_player_widget.dart';
+import 'package:projectuas/pages/connectivity_helper.dart';
 import 'package:projectuas/pages/snackbar_helper.dart';
 import 'package:projectuas/pages/audio_manager.dart';
 import 'package:projectuas/pages/sleep_manager.dart';
-import 'package:projectuas/pages/connectivity_helper.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'dart:async';
 
 class SleepPage extends StatefulWidget {
   const SleepPage({super.key});
@@ -141,6 +142,8 @@ class _SleepPageState extends State<SleepPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.transparent,
+      extendBody: true,
+      bottomNavigationBar: const MiniPlayerWidget(),
       body: Container(
         decoration: const BoxDecoration(
           image: DecorationImage(

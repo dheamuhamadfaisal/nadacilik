@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:projectuas/pages/snackbar_helper.dart';
-import 'player_page.dart';
 import 'package:projectuas/pages/connectivity_helper.dart';
+import 'package:projectuas/pages/snackbar_helper.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'mini_player_widget.dart';
+import 'player_page.dart';
+
 
 class EdukasiPage extends StatefulWidget {
   const EdukasiPage({super.key});
@@ -62,7 +64,6 @@ class _EdukasiPageState extends State<EdukasiPage> {
       debugPrint('Error fetching lagu: $e');
       setState(() => isLoading = false);
       if (mounted) {
-        // Ganti _showToastAboveSearch dengan showTopNotif
         showTopNotif(
           context,
           message: 'Gagal memuat lagu. Coba lagi nanti.',
@@ -89,6 +90,42 @@ class _EdukasiPageState extends State<EdukasiPage> {
   }
 
   Future<void> _onTambah(Map<String, dynamic> lagu) async {
+    final konfirmasi = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          'Apakah Anda Ingin\nMenghapus\nLagu dari Favorite?',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        ),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)
+              ),
+            ),
+            child: const Text('Ya', style: TextStyle(color: Colors.white)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, false),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)
+              ),
+            ),
+            child: const Text('Tidak', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+    if (konfirmasi != true) return;
+
     try {
       final existing = await FirebaseFirestore.instance
           .collection('favorit')
@@ -134,6 +171,8 @@ class _EdukasiPageState extends State<EdukasiPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.transparent,
+      extendBody: true,
+      bottomNavigationBar: const MiniPlayerWidget(),
       body: Container(
         decoration: const BoxDecoration(
           image: DecorationImage(
