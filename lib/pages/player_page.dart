@@ -45,7 +45,7 @@ class _PlayerPageState extends State<PlayerPage> {
   StreamSubscription? _positionSub;
   StreamSubscription? _playingSub;
   StreamSubscription? _completedSub;
-  StreamSubscription? _laguChangedSub; 
+  StreamSubscription? _laguChangedSub;
 
   List<Map<String, dynamic>> get _playlist =>
       AudioManager.instance.currentPlaylist.isNotEmpty
@@ -69,19 +69,18 @@ class _PlayerPageState extends State<PlayerPage> {
     _initPlayer();
 
     _laguChangedSub = AudioManager.instance.laguChangedStream.listen((_) {
-      if (mounted) {
-        setState(() {
-          _judul = AudioManager.instance.currentJudul ?? _judul;
-          _artis = AudioManager.instance.currentArtis ?? _artis;
-          _audioUrl = AudioManager.instance.currentUrl ?? _audioUrl;
-          _coverUrl = AudioManager.instance.currentCoverUrl;
-          _currentIndex = AudioManager.instance.currentIndex;
-          _position = Duration.zero;
-          _duration = Duration.zero;
-          isLoading = false;
-        });
-        _resubscribeStreams();
-      }
+      if (!mounted) return;
+      setState(() {
+        _judul = AudioManager.instance.currentJudul ?? _judul;
+        _artis = AudioManager.instance.currentArtis ?? _artis;
+        _audioUrl = AudioManager.instance.currentUrl ?? _audioUrl;
+        _coverUrl = AudioManager.instance.currentCoverUrl;
+        _currentIndex = AudioManager.instance.currentIndex;
+        _position = Duration.zero;
+        _duration = Duration.zero;
+        isLoading = false;
+      });
+      _resubscribeStreams();
     });
   }
 
@@ -139,8 +138,6 @@ class _PlayerPageState extends State<PlayerPage> {
         AudioManager.instance.currentArtis = _artis;
         AudioManager.instance.currentCoverUrl = _coverUrl;
         AudioManager.instance.currentIndex = _currentIndex;
-
-        await _player.stop();
         await _player.setUrl(_audioUrl);
 
         if (mounted) setState(() => isLoading = false);
@@ -149,6 +146,7 @@ class _PlayerPageState extends State<PlayerPage> {
 
       _resubscribeStreams();
     } catch (e) {
+      debugPrint('Error initPlayer: $e');
       if (mounted) {
         setState(() => isLoading = false);
         showTopNotif(
@@ -165,13 +163,14 @@ class _PlayerPageState extends State<PlayerPage> {
     if (newIndex < 0 || newIndex >= _playlist.length) return;
 
     final lagu = _playlist[newIndex];
+    final newUrl = lagu['audio_url'] ?? '';
 
     if (mounted) {
       setState(() {
         _currentIndex = newIndex;
         _judul = lagu['judul'] ?? '';
         _artis = lagu['artis'] ?? '';
-        _audioUrl = lagu['audio_url'] ?? '';
+        _audioUrl = newUrl;
         _coverUrl = lagu['cover_url'];
         isLoading = true;
         _position = Duration.zero;
@@ -179,16 +178,29 @@ class _PlayerPageState extends State<PlayerPage> {
       });
     }
 
-    await AudioManager.instance.playLagu(
-      audioUrl: _audioUrl,
-      judul: _judul,
-      artis: _artis,
-      coverUrl: _coverUrl,
-      playlist: _playlist,
-      index: newIndex,
-    );
+    try {
+      await _player.setUrl(newUrl);
 
-    if (mounted) setState(() => isLoading = false);
+      AudioManager.instance.currentUrl = newUrl;
+      AudioManager.instance.currentJudul = _judul;
+      AudioManager.instance.currentArtis = _artis;
+      AudioManager.instance.currentCoverUrl = _coverUrl;
+      AudioManager.instance.currentIndex = newIndex;
+
+      _player.play();
+    } catch (e) {
+      debugPrint('Error changeLagu: $e');
+      if (mounted) {
+        showTopNotif(
+          context,
+          message: 'Gagal memuat lagu',
+          backgroundColor: Colors.red,
+        );
+      }
+    } finally {
+      if (mounted) setState(() => isLoading = false);
+    }
+
     _resubscribeStreams();
   }
 
@@ -253,7 +265,7 @@ class _PlayerPageState extends State<PlayerPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ── AppBar ──
+                // AppBar
                 Padding(
                   padding: const EdgeInsets.fromLTRB(8, 8, 16, 0),
                   child: Row(
@@ -284,7 +296,7 @@ class _PlayerPageState extends State<PlayerPage> {
                   ),
                 ),
 
-                // ── Card Player ──
+                // Card Player
                 Expanded(
                   child: Center(
                     child: Padding(
@@ -299,7 +311,7 @@ class _PlayerPageState extends State<PlayerPage> {
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              // ── Cover ──
+                              // Cover
                               Container(
                                 width: 160,
                                 height: 160,
@@ -319,8 +331,7 @@ class _PlayerPageState extends State<PlayerPage> {
                                       ? CachedNetworkImage(
                                           imageUrl: _coverUrl!,
                                           fit: BoxFit.cover,
-                                          placeholder: (context, url) =>
-                                              Container(
+                                          placeholder: (context, url) => Container(
                                             color: Colors.blue[50],
                                             child: const Center(
                                               child: CircularProgressIndicator(),
@@ -335,7 +346,7 @@ class _PlayerPageState extends State<PlayerPage> {
 
                               const SizedBox(height: 24),
 
-                              // ── Judul & Artis ──
+                              // Judul & Artis
                               Text(
                                 _judul,
                                 textAlign: TextAlign.center,
@@ -357,7 +368,7 @@ class _PlayerPageState extends State<PlayerPage> {
 
                               const SizedBox(height: 20),
 
-                              // ── Progress Bar ──
+                              // Progress Bar
                               SliderTheme(
                                 data: SliderTheme.of(context).copyWith(
                                   thumbShape: const RoundSliderThumbShape(
@@ -382,7 +393,7 @@ class _PlayerPageState extends State<PlayerPage> {
                                 ),
                               ),
 
-                              // ── Waktu ──
+                              // Waktu
                               Padding(
                                 padding: const EdgeInsets.symmetric(horizontal: 8),
                                 child: Row(
@@ -408,26 +419,25 @@ class _PlayerPageState extends State<PlayerPage> {
 
                               const SizedBox(height: 16),
 
-                              // ── Kontrol ──
+                              // Kontrol
                               isLoading
                                   ? const CircularProgressIndicator()
                                   : Row(
                                       mainAxisAlignment: MainAxisAlignment.center,
                                       children: [
-                                        // ── Previous ──
+                                        // Previous
                                         IconButton(
                                           onPressed: _previous,
                                           icon: Icon(
                                             Icons.skip_previous_rounded,
                                             size: 40,
-                                            // ✅ pakai _playlist bukan widget.playlist
                                             color: _playlist.isEmpty || _currentIndex == 0
                                                 ? Colors.grey[400]
                                                 : Colors.black87,
                                           ),
                                         ),
                                         const SizedBox(width: 16),
-                                        // ── Play/Pause ──
+                                        // Play/Pause
                                         Container(
                                           decoration: BoxDecoration(
                                             color: Colors.blue,
@@ -452,7 +462,7 @@ class _PlayerPageState extends State<PlayerPage> {
                                           ),
                                         ),
                                         const SizedBox(width: 16),
-                                        // ── Next ──
+                                        // Next
                                         IconButton(
                                           onPressed: _next,
                                           icon: Icon(
@@ -474,7 +484,7 @@ class _PlayerPageState extends State<PlayerPage> {
                   ),
                 ),
 
-                // ── Footer ──
+                // Footer
                 Center(
                   child: Padding(
                     padding: const EdgeInsets.only(bottom: 16),

@@ -1,11 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:projectuas/pages/connectivity_helper.dart';
 import 'package:projectuas/pages/snackbar_helper.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'mini_player_widget.dart';
-import 'player_page.dart';
-
+import 'audio_manager.dart';
 
 class EdukasiPage extends StatefulWidget {
   const EdukasiPage({super.key});
@@ -18,12 +17,14 @@ class _EdukasiPageState extends State<EdukasiPage> {
   final TextEditingController searchController = TextEditingController();
   List<Map<String, dynamic>> allLagu = [];
   List<Map<String, dynamic>> filteredLagu = [];
+  Set<String> _judulFavorit = {};
   bool isLoading = true;
+  static const _timeout = Duration(seconds: 10);
 
   @override
   void initState() {
     super.initState();
-    _fetchLagu();
+    _fetchAll();
   }
 
   @override
@@ -32,138 +33,160 @@ class _EdukasiPageState extends State<EdukasiPage> {
     super.dispose();
   }
 
-  Future<void> _fetchLagu() async {
-    final adaKoneksi = await cekKoneksi();
-    if (!adaKoneksi){
-      if(mounted){
-        showTopNotif(
-          context, 
-          message: 'Tidak Ada Koneksi Internet!',
-        );
-      }
-      return;
-    }
-
+  Future<void> _fetchAll() async {
     setState(() => isLoading = true);
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('lagu')
-          .get();
+      final results = await Future.wait([
+        FirebaseFirestore.instance
+            .collection('lagu')
+            .where('tipe', isEqualTo: 'edukasi')
+            .get()
+            .timeout(_timeout),
+        FirebaseFirestore.instance
+            .collection('favorit')
+            .get()
+            .timeout(_timeout),
+      ]);
 
-      final filtered = snapshot.docs
-          .where((doc) => doc.data()['tipe']?.toString().trim().toLowerCase() == 'edukasi')
-          .map((doc) => doc.data())
-          .toList();
+      final laguList = results[0].docs.map((doc) => doc.data()).toList();
+      final judulFavSet = results[1].docs
+          .map((doc) => doc.data()['judul']?.toString() ?? '')
+          .toSet();
 
-      setState(() {
-        allLagu = filtered;
-        filteredLagu = List.from(allLagu);
-        isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          allLagu = laguList;
+          filteredLagu = List.from(allLagu);
+          _judulFavorit = judulFavSet;
+          isLoading = false;
+        });
+      }
+    } on TimeoutException {
+      if (mounted) {
+        setState(() => isLoading = false);
+        showTopNotif(context, message: 'Koneksi timeout, coba lagi.', backgroundColor: Colors.red);
+      }
+    } on FirebaseException catch (e) {
+      debugPrint('Firebase error: $e');
+      if (mounted) {
+        setState(() => isLoading = false);
+        showTopNotif(context, message: 'Tidak ada koneksi internet!', backgroundColor: Colors.red);
+      }
     } catch (e) {
       debugPrint('Error fetching lagu: $e');
-      setState(() => isLoading = false);
       if (mounted) {
-        showTopNotif(
-          context,
-          message: 'Gagal memuat lagu. Coba lagi nanti.',
-          backgroundColor: Colors.redAccent,
-        );
+        setState(() => isLoading = false);
+        showTopNotif(context, message: 'Gagal memuat lagu. Coba lagi nanti.', backgroundColor: Colors.redAccent);
       }
     }
   }
 
   void _onSearch(String query) {
     setState(() {
-      filteredLagu = allLagu
-          .where((lagu) =>
-              lagu['judul']
-                  .toString()
-                  .toLowerCase()
-                  .contains(query.toLowerCase()) ||
-              lagu['artis']
-                  .toString()
-                  .toLowerCase()
-                  .contains(query.toLowerCase()))
-          .toList();
+      filteredLagu = query.isEmpty
+          ? List.from(allLagu)
+          : allLagu.where((lagu) {
+              final q = query.toLowerCase();
+              return lagu['judul'].toString().toLowerCase().contains(q) ||
+                  lagu['artis'].toString().toLowerCase().contains(q);
+            }).toList();
     });
   }
 
   Future<void> _onTambah(Map<String, dynamic> lagu) async {
+    final judul = lagu['judul']?.toString() ?? '';
+    final artis = lagu['artis']?.toString() ?? '';
+
+    if (_judulFavorit.contains(judul)) {
+      showTopNotif(context, message: '$judul sudah ada di Favorit!', backgroundColor: Colors.orange);
+      return;
+    }
+
     final konfirmasi = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text(
-          'Apakah Anda Ingin\nMenghapus\nLagu dari Favorite?',
-          textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+      barrierColor: Colors.black.withOpacity(0.5),
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.95),
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 20, offset: const Offset(0, 8)),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 60, height: 60,
+                decoration: BoxDecoration(
+                  color: Colors.blue.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.favorite_rounded, color: Colors.blue, size: 30),
+              ),
+              const SizedBox(height: 16),
+              const Text('Tambah ke Favorit?', textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Colors.black87)),
+              const SizedBox(height: 8),
+              Text(judul, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 14, color: Colors.grey[700])),
+              const SizedBox(height: 4),
+              Text(artis, textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12, color: Colors.grey[500])),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        side: BorderSide(color: Colors.grey[300]!),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: Text('Batal',
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.grey[600])),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(context, true),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        backgroundColor: Colors.blue,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: const Text('Tambahkan',
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
-        actionsAlignment: MainAxisAlignment.center,
-        actions: [
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8)
-              ),
-            ),
-            child: const Text('Ya', style: TextStyle(color: Colors.white)),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, false),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8)
-              ),
-            ),
-            child: const Text('Tidak', style: TextStyle(color: Colors.white)),
-          ),
-        ],
       ),
     );
+
     if (konfirmasi != true) return;
 
     try {
-      final existing = await FirebaseFirestore.instance
-          .collection('favorit')
-          .where('judul', isEqualTo: lagu['judul'])
-          .get();
-
-      if (existing.docs.isNotEmpty) {
-        if (mounted) {
-          showTopNotif(
-            context,
-            message: '${lagu['judul']} sudah ada di Favorit!',
-            backgroundColor: Colors.orange,
-          );
-        }
-        return;
-      }
-
-      await FirebaseFirestore.instance
-          .collection('favorit')
-          .add(lagu);
-
+      await FirebaseFirestore.instance.collection('favorit').add(lagu).timeout(_timeout);
+      setState(() => _judulFavorit.add(judul));
       if (mounted) {
-        showTopNotif(
-          context,
-          message: '${lagu['judul']} ditambahkan ke Favorit!',
-          backgroundColor:const Color.fromARGB(255, 39, 87, 217),
-        );
+        showTopNotif(context, message: '✓ $judul ditambahkan ke Favorit!', backgroundColor: Colors.blue);
       }
+    } on TimeoutException {
+      if (mounted) showTopNotif(context, message: 'Koneksi timeout, coba lagi.', backgroundColor: Colors.red);
     } catch (e) {
       debugPrint('Error tambah favorit: $e');
-      if (mounted) {
-        // Ganti _showToastAboveSearch dengan showTopNotif
-        showTopNotif(
-          context,
-          message: 'Gagal menambahkan ke Favorit.',
-          backgroundColor: Colors.red,
-        );
-      }
+      if (mounted) showTopNotif(context, message: 'Gagal menambahkan ke Favorit.', backgroundColor: Colors.red);
     }
   }
 
@@ -186,200 +209,113 @@ class _EdukasiPageState extends State<EdukasiPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-
-                // ── AppBar ──
                 Padding(
                   padding: const EdgeInsets.fromLTRB(8, 8, 16, 0),
                   child: Row(
                     children: [
                       IconButton(
                         onPressed: () => Navigator.pop(context),
-                        icon: const Icon(Icons.arrow_back_ios_new_rounded,
-                            color: Colors.white),
+                        icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
                       ),
-                      const Text(
-                        'Edukasi',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                          shadows: [
-                            Shadow(
-                              blurRadius: 4,
-                              color: Colors.black38,
-                              offset: Offset(1, 1),
-                            ),
-                          ],
-                        ),
-                      ),
+                      const Text('Edukasi', style: TextStyle(
+                        fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white,
+                        shadows: [Shadow(blurRadius: 4, color: Colors.black38, offset: Offset(1, 1))],
+                      )),
                     ],
                   ),
                 ),
-
                 const SizedBox(height: 12),
-
-                // ── Search Bar ──
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Container(
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.95),
                       borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
+                      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 8, offset: const Offset(0, 2))],
                     ),
                     child: TextField(
                       controller: searchController,
                       onChanged: _onSearch,
                       decoration: InputDecoration(
                         hintText: 'Cari lagu edukasi...',
-                        hintStyle: TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey[400],
-                        ),
-                        prefixIcon: const Icon(Icons.search_rounded,
-                            color: Colors.grey),
+                        hintStyle: TextStyle(fontSize: 13, color: Colors.grey[400]),
+                        prefixIcon: const Icon(Icons.search_rounded, color: Colors.grey),
                         border: InputBorder.none,
-                        contentPadding:
-                            const EdgeInsets.symmetric(vertical: 14),
+                        contentPadding: const EdgeInsets.symmetric(vertical: 14),
                       ),
                     ),
                   ),
                 ),
-
                 const SizedBox(height: 16),
-
-                // ── List Lagu ──
                 Expanded(
                   child: isLoading
-                      ? const Center(
-                          child: CircularProgressIndicator(color: Colors.white),
-                        )
+                      ? const Center(child: CircularProgressIndicator(color: Colors.white))
                       : filteredLagu.isEmpty
                           ? Center(
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(Icons.music_off_rounded,
-                                      size: 60,
-                                      color: Colors.white.withOpacity(0.7)),
+                                  Icon(Icons.music_off_rounded, size: 60, color: Colors.white.withOpacity(0.7)),
                                   const SizedBox(height: 12),
-                                  Text(
-                                    'Belum ada lagu edukasi',
-                                    style: TextStyle(
-                                      color: Colors.white.withOpacity(0.8),
-                                      fontSize: 14,
-                                    ),
-                                  ),
+                                  Text('Belum ada lagu edukasi',
+                                    style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 14)),
                                 ],
                               ),
                             )
-                          : ListView.builder(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 16, vertical: 4),
-                              itemCount: filteredLagu.length,
-                              itemBuilder: (context, index) {
-                                final lagu = filteredLagu[index];
-                                return Container(
-                                  margin: const EdgeInsets.only(bottom: 10),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.92),
-                                    borderRadius: BorderRadius.circular(12),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withOpacity(0.07),
-                                        blurRadius: 6,
-                                        offset: const Offset(0, 2),
+                          : RefreshIndicator(
+                              onRefresh: _fetchAll,
+                              child: ListView.builder(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                                itemCount: filteredLagu.length,
+                                itemBuilder: (context, index) {
+                                  final lagu = filteredLagu[index];
+                                  final sudahFavorit = _judulFavorit.contains(lagu['judul']?.toString() ?? '');
+                                  return Container(
+                                    margin: const EdgeInsets.only(bottom: 10),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.92),
+                                      borderRadius: BorderRadius.circular(12),
+                                      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.07), blurRadius: 6, offset: const Offset(0, 2))],
+                                    ),
+                                    child: ListTile(
+                                      onTap: () => AudioManager.instance.playLagu(
+                                        judul: lagu['judul'] ?? '',
+                                        artis: lagu['artis'] ?? '',
+                                        audioUrl: lagu['audio_url'] ?? '',
+                                        coverUrl: lagu['cover_url'],
+                                        playlist: filteredLagu,
+                                        index: index,
                                       ),
-                                    ],
-                                  ),
-                                  child: ListTile(
-                                    onTap: () => Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => PlayerPage(
-                                          judul: lagu['judul'] ?? '',
-                                          artis: lagu['artis'] ?? '',
-                                          audioUrl: lagu['audio_url'] ?? '',
-                                          coverUrl: lagu['cover_url'],
-                                          playlist: filteredLagu,
-                                          currentIndex: index,
+                                      leading: Container(
+                                        width: 46, height: 46,
+                                        decoration: BoxDecoration(color: Colors.orange[100], borderRadius: BorderRadius.circular(10)),
+                                        child: ClipRRect(
+                                          borderRadius: BorderRadius.circular(10),
+                                          child: lagu['cover_url'] != null && lagu['cover_url'].toString().isNotEmpty
+                                              ? CachedNetworkImage(
+                                                  imageUrl: lagu['cover_url'], fit: BoxFit.cover,
+                                                  placeholder: (_, __) => Container(color: Colors.orange[100], child: const Icon(Icons.music_note_rounded, color: Colors.orange)),
+                                                  errorWidget: (_, __, ___) => Container(color: Colors.orange[100], child: const Icon(Icons.music_note_rounded, color: Colors.orange)),
+                                                )
+                                              : Container(color: Colors.orange[100], child: const Icon(Icons.music_note_rounded, color: Colors.orange)),
+                                        ),
+                                      ),
+                                      title: Text(lagu['judul'] ?? '', maxLines: 1, overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                                      subtitle: Text(lagu['artis'] ?? '', maxLines: 1, overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                                      trailing: IconButton(
+                                        onPressed: sudahFavorit ? null : () => _onTambah(lagu),
+                                        icon: Icon(
+                                          sudahFavorit ? Icons.check_circle_rounded : Icons.add_circle_outline_rounded,
+                                          color: sudahFavorit ? Colors.green : Colors.orange,
+                                          size: 28,
                                         ),
                                       ),
                                     ),
-                                    leading: Container(
-                                      width: 46,
-                                      height: 46,
-                                      decoration: BoxDecoration(
-                                        color: Colors.orange[100],
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                      child: ClipRRect(
-                                        borderRadius: BorderRadius.circular(10),
-                                        child: lagu['cover_url'] != null &&
-                                                lagu['cover_url'].toString().isNotEmpty
-                                            ? CachedNetworkImage(
-                                                imageUrl: lagu['cover_url'],
-                                                fit: BoxFit.cover,
-                                                placeholder: (context, url) => Container(
-                                                  color: Colors.orange[100],
-                                                  child: const Icon(
-                                                    Icons.music_note_rounded,
-                                                    color: Colors.orange,
-                                                  ),
-                                                ),
-                                                errorWidget: (context, url, error) =>
-                                                    Container(
-                                                  color: Colors.orange[100],
-                                                  child: const Icon(
-                                                    Icons.music_note_rounded,
-                                                    color: Colors.orange,
-                                                  ),
-                                                ),
-                                              )
-                                            : Container(
-                                                color: Colors.orange[100],
-                                                child: const Icon(
-                                                  Icons.music_note_rounded,
-                                                  color: Colors.orange,
-                                                ),
-                                              ),
-                                      ),
-                                    ),
-                                    title: Text(
-                                      lagu['judul'] ?? '',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 14,
-                                      ),
-                                    ),
-                                    subtitle: Text(
-                                      lagu['artis'] ?? '',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.grey[600],
-                                      ),
-                                    ),
-                                    trailing: IconButton(
-                                      onPressed: () => _onTambah(lagu),
-                                      icon: const Icon(
-                                        Icons.add_circle_outline_rounded,
-                                        color: Colors.orange,
-                                        size: 28,
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              },
+                                  );
+                                },
+                              ),
                             ),
                 ),
               ],

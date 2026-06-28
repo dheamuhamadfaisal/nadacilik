@@ -36,7 +36,6 @@ class AudioManager {
       currentIndex = index;
     }
 
-    await player.stop();
     await player.setUrl(audioUrl);
     player.play();
     _laguChangedController.add(null);
@@ -72,7 +71,10 @@ class AudioManager {
     );
   }
 
-  bool isSameSong(String audioUrl) {
-    return currentUrl == audioUrl;
+  bool isSameSong(String audioUrl) => currentUrl == audioUrl;
+
+  void dispose() {
+    _laguChangedController.close();
+    player.dispose();
   }
 }

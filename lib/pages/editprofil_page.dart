@@ -1,7 +1,8 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'snackbar_helper.dart'; 
+import 'snackbar_helper.dart';
 
 class EditProfilPage extends StatefulWidget {
   const EditProfilPage({super.key});
@@ -17,9 +18,11 @@ class _EditProfilPageState extends State<EditProfilPage> {
 
   String? usernameError;
   String? passwordError;
-  String? confirmPasswordError;  
+  String? confirmPasswordError;
   bool isLoading = false;
   String oldUsername = '';
+
+  static const _timeout = Duration(seconds: 10);
 
   @override
   void initState() {
@@ -30,10 +33,12 @@ class _EditProfilPageState extends State<EditProfilPage> {
   Future<void> _loadUsername() async {
     final prefs = await SharedPreferences.getInstance();
     final saved = prefs.getString('username') ?? '';
-    setState(() {
-      oldUsername = saved;
-      usernameController.text = saved;
-    });
+    if (mounted) {
+      setState(() {
+        oldUsername = saved;
+        usernameController.text = saved;
+      });
+    }
   }
 
   @override
@@ -65,69 +70,78 @@ class _EditProfilPageState extends State<EditProfilPage> {
 
     if (usernameError != null || passwordError != null || confirmPasswordError != null) return;
 
+    final passwordTidakDiubah = newPassword.isEmpty;
+    if (newUsername == oldUsername && passwordTidakDiubah) {
+      showTopNotif(context, message: 'Tidak ada perubahan');
+      return;
+    }
+
     setState(() => isLoading = true);
 
     try {
-      final snapshot = await FirebaseFirestore.instance
+      final Future<QuerySnapshot> snapshotFuture = FirebaseFirestore.instance
           .collection('users')
           .where('username', isEqualTo: oldUsername)
-          .get();
+          .get()
+          .timeout(_timeout);
+
+      final Future<QuerySnapshot>? existingFuture = newUsername != oldUsername
+          ? FirebaseFirestore.instance
+              .collection('users')
+              .where('username', isEqualTo: newUsername)
+              .get()
+              .timeout(_timeout)
+          : null;
+
+      final results = await Future.wait([
+        snapshotFuture,
+        if (existingFuture != null) existingFuture,
+      ]);
+
+      final snapshot = results[0];
+      final existing = existingFuture != null ? results[1] : null;
 
       if (snapshot.docs.isEmpty) {
-        setState(() {
-          usernameError = 'Akun tidak ditemukan';
-          isLoading = false;
-        });
+        setState(() { usernameError = 'Akun tidak ditemukan'; isLoading = false; });
         return;
       }
 
-      if (newUsername != oldUsername) {
-        final existing = await FirebaseFirestore.instance
-            .collection('users')
-            .where('username', isEqualTo: newUsername)
-            .get();
-
-        if (existing.docs.isNotEmpty) {
-          setState(() {
-            usernameError = 'Username sudah digunakan';
-            isLoading = false;
-          });
-          return;
-        }
+      if (existing != null && existing.docs.isNotEmpty) {
+        setState(() { usernameError = 'Username sudah digunakan'; isLoading = false; });
+        showTopNotif(context, message: 'Username sudah digunakan', backgroundColor: Colors.red);
+        return;
       }
 
       final docRef = snapshot.docs.first.reference;
       final Map<String, dynamic> updateData = {'username': newUsername};
+      if (newPassword.isNotEmpty) updateData['password'] = newPassword;
 
-      if (newPassword.isNotEmpty) {
-        updateData['password'] = newPassword;
-      }
-
-      await docRef.update(updateData);
+      await docRef.update(updateData).timeout(_timeout);
 
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('username', newUsername);
 
       if (!mounted) return;
 
-      // ← Ganti showTopSnackBar dengan showTopNotif
-      showTopNotif(context, message: 'Profil Berhasil Diperbarui');
-
+      showTopNotif(context, message: 'Profil berhasil diperbarui');
       await Future.delayed(const Duration(milliseconds: 500));
 
       if (!mounted) return;
       Navigator.pop(context, newUsername);
+    } on TimeoutException {
+      if (!mounted) return;
+      setState(() => isLoading = false);
+      showTopNotif(context, message: 'Koneksi timeout, coba lagi.', backgroundColor: Colors.red);
+    } on FirebaseException catch (e) {
+      debugPrint('Firebase error: $e');
+      if (!mounted) return;
+      setState(() => isLoading = false);
+      showTopNotif(context, message: 'Tidak ada koneksi internet!', backgroundColor: Colors.red);
     } catch (e) {
       debugPrint('Error update profil: $e');
       if (!mounted) return;
-      showTopNotif(
-        context,
-        message: 'Terjadi kesalahan. Coba lagi.',
-        backgroundColor: Colors.red,
-      );
-      setState(() {
-        isLoading = false;
-      });
+      setState(() => isLoading = false);
+      showTopNotif(context, message: 'Terjadi kesalahan. Coba lagi.', backgroundColor: Colors.red);
     }
   }
 
@@ -147,7 +161,7 @@ class _EditProfilPageState extends State<EditProfilPage> {
           child: SafeArea(
             child: Column(
               children: [
-                // ── AppBar custom ──
+                // AppBar
                 Padding(
                   padding: const EdgeInsets.fromLTRB(8, 12, 20, 0),
                   child: Row(
@@ -175,7 +189,7 @@ class _EditProfilPageState extends State<EditProfilPage> {
                   ),
                 ),
 
-                // ── Form ──
+                // Form
                 Expanded(
                   child: Center(
                     child: SingleChildScrollView(
@@ -204,20 +218,15 @@ class _EditProfilPageState extends State<EditProfilPage> {
                                 const SizedBox(height: 16),
                                 Text(
                                   'Perbarui informasi akunmu',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.grey[600],
-                                  ),
+                                  style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                                 ),
                                 const SizedBox(height: 24),
 
-                                // ── Username ──
+                                // Username
                                 TextField(
                                   controller: usernameController,
                                   onChanged: (_) {
-                                    if (usernameError != null) {
-                                      setState(() => usernameError = null);
-                                    }
+                                    if (usernameError != null) setState(() => usernameError = null);
                                   },
                                   decoration: InputDecoration(
                                     labelText: 'Username',
@@ -230,14 +239,12 @@ class _EditProfilPageState extends State<EditProfilPage> {
                                 ),
                                 const SizedBox(height: 16),
 
-                                // ── Password Baru ──
+                                // Password Baru
                                 TextField(
                                   controller: passwordController,
                                   obscureText: true,
                                   onChanged: (_) {
-                                    if (passwordError != null) {
-                                      setState(() => passwordError = null);
-                                    }
+                                    if (passwordError != null) setState(() => passwordError = null);
                                   },
                                   decoration: InputDecoration(
                                     labelText: 'Password Baru (opsional)',
@@ -250,7 +257,7 @@ class _EditProfilPageState extends State<EditProfilPage> {
                                 ),
                                 const SizedBox(height: 16),
 
-                                // ── Konfirmasi Password ──
+                                // Konfirmasi Password
                                 TextField(
                                   controller: confirmPasswordController,
                                   obscureText: true,
@@ -270,7 +277,7 @@ class _EditProfilPageState extends State<EditProfilPage> {
                                 ),
                                 const SizedBox(height: 24),
 
-                                // ── Tombol Simpan ──
+                                // Tombol Simpan
                                 SizedBox(
                                   width: double.infinity,
                                   height: 50,
@@ -293,12 +300,12 @@ class _EditProfilPageState extends State<EditProfilPage> {
                                 ),
                                 const SizedBox(height: 12),
 
-                                // ── Tombol Batal ──
+                                // Tombol Batal
                                 SizedBox(
                                   width: double.infinity,
                                   height: 50,
                                   child: OutlinedButton(
-                                    onPressed: () => Navigator.pop(context),
+                                    onPressed: isLoading ? null : () => Navigator.pop(context),
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: const Color.fromARGB(255, 230, 4, 4),
                                       foregroundColor: Colors.white,
