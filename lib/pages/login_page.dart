@@ -1,8 +1,8 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:projectuas/pages/snackbar_helper.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:projectuas/pages/connectivity_helper.dart';
 import 'home_page.dart';
 
 class LoginPage extends StatefulWidget {
@@ -16,13 +16,15 @@ class _LoginPageState extends State<LoginPage> {
   final TextEditingController usernameController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
   final TextEditingController confirmPasswordController = TextEditingController();
-  
+
   String? usernameError;
   String? passwordError;
   String? confirmPasswordError;
-  
+
   bool isLoading = false;
   bool isRegisterMode = false;
+
+  static const _timeout = Duration(seconds: 10);
 
   @override
   void dispose() {
@@ -32,20 +34,13 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
+  void _showNotif(String message, Color color) {
+    if (!mounted) return;
+    showTopNotif(context, message: message, backgroundColor: color);
+  }
+
   // Fungsi Login
   Future<void> login() async {
-    final adaKoneksi = await cekKoneksi();
-    if (!adaKoneksi) {
-      if (mounted) {
-        showTopNotif(
-          context,
-          message: 'Tidak ada koneksi internet!',
-          backgroundColor: Colors.red,
-      );
-    }
-    return;
-    }
-
     setState(() {
       usernameError = usernameController.text.isEmpty ? 'Username tidak boleh kosong' : null;
       passwordError = passwordController.text.isEmpty ? 'Password tidak boleh kosong' : null;
@@ -60,21 +55,15 @@ class _LoginPageState extends State<LoginPage> {
           .collection('users')
           .where('username', isEqualTo: usernameController.text.trim())
           .where('password', isEqualTo: passwordController.text)
-          .get();
+          .get()
+          .timeout(_timeout);
 
       if (snapshot.docs.isEmpty) {
         setState(() {
-          usernameError = 'Akun tidak ditemukan, Silahkan daftar terlebih dahulu';
+          usernameError = 'Akun tidak ditemukan, silahkan daftar terlebih dahulu';
           isLoading = false;
         });
-        if (mounted) {
-          // Hanya showTopNotif, hapus SnackBarAction
-          showTopNotif(
-            context,
-            message: 'Akun tidak ditemukan! Silahkan daftar terlebih dahulu.',
-            backgroundColor: Colors.orange,
-          );
-        }
+        _showNotif('Akun tidak ditemukan! Silahkan daftar terlebih dahulu.', Colors.orange);
         return;
       }
 
@@ -83,42 +72,26 @@ class _LoginPageState extends State<LoginPage> {
       await prefs.setString('username', usernameController.text.trim());
 
       if (!mounted) return;
-
-      // Tidak perlu clearSnackBars karena sudah pakai showTopNotif
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const HomePage()),
       );
+    } on TimeoutException {
+      setState(() { usernameError = null; isLoading = false; });
+      _showNotif('Koneksi timeout, coba lagi.', Colors.red);
+    } on FirebaseException catch (e) {
+      debugPrint('Firebase error login: $e');
+      setState(() { usernameError = null; isLoading = false; });
+      _showNotif('Tidak ada koneksi internet!', Colors.red);
     } catch (e) {
       debugPrint('Error login: $e');
-      if (mounted) {
-        showTopNotif(
-          context,
-          message: 'Terjadi kesalahan. Coba lagi.',
-          backgroundColor: Colors.red,
-        );
-      }
-      setState(() {
-        usernameError = 'Terjadi kesalahan. Coba lagi.';
-        isLoading = false;
-      });
+      setState(() { usernameError = 'Terjadi kesalahan. Coba lagi.'; isLoading = false; });
+      _showNotif('Terjadi kesalahan. Coba lagi.', Colors.red);
     }
   }
 
   // Fungsi Register
   Future<void> register() async {
-    final adaKoneksi = await cekKoneksi();
-    if (!adaKoneksi) {
-      if (mounted) {
-        showTopNotif(
-          context,
-          message: 'Tidak ada koneksi internet!',
-          backgroundColor: Colors.red,
-      );
-    }
-    return;
-    }
-    
     setState(() {
       usernameError = usernameController.text.isEmpty ? 'Username tidak boleh kosong' : null;
       passwordError = passwordController.text.isEmpty ? 'Password tidak boleh kosong' : null;
@@ -137,28 +110,20 @@ class _LoginPageState extends State<LoginPage> {
       final existing = await FirebaseFirestore.instance
           .collection('users')
           .where('username', isEqualTo: usernameController.text.trim())
-          .get();
+          .get()
+          .timeout(_timeout);
 
       if (existing.docs.isNotEmpty) {
-        setState(() {
-          usernameError = 'Username sudah digunakan';
-          isLoading = false;
-        });
-        if (mounted) {
-          showTopNotif(
-            context,
-            message: 'Username sudah digunakan, coba yang lain.',
-            backgroundColor: Colors.red,
-          );
-        }
+        setState(() { usernameError = 'Username sudah digunakan'; isLoading = false; });
+        _showNotif('Username sudah digunakan, coba yang lain.', Colors.red);
         return;
       }
 
       await FirebaseFirestore.instance.collection('users').add({
         'username': usernameController.text.trim(),
         'password': passwordController.text,
-        'createdAt': DateTime.now().toIso8601String(),
-      });
+        'createdAt': FieldValue.serverTimestamp(),
+      }).timeout(_timeout);
 
       if (!mounted) return;
 
@@ -170,25 +135,18 @@ class _LoginPageState extends State<LoginPage> {
         confirmPasswordController.clear();
       });
 
-      // Ganti ScaffoldMessenger dengan showTopNotif
-      showTopNotif(
-        context,
-        message: 'Registrasi berhasil! Silakan login.',
-        backgroundColor: const Color.fromARGB(255, 39, 87, 217),
-      );
+      _showNotif('Registrasi berhasil! Silakan login.', const Color.fromARGB(255, 39, 87, 217));
+    } on TimeoutException {
+      setState(() => isLoading = false);
+      _showNotif('Koneksi timeout, coba lagi.', Colors.red);
+    } on FirebaseException catch (e) {
+      debugPrint('Firebase error register: $e');
+      setState(() => isLoading = false);
+      _showNotif('Tidak ada koneksi internet!', Colors.red);
     } catch (e) {
       debugPrint('Error register: $e');
-      if (mounted) {
-        showTopNotif(
-          context,
-          message: 'Terjadi kesalahan. Coba lagi.',
-          backgroundColor: Colors.red,
-        );
-      }
-      setState(() {
-        usernameError = 'Terjadi kesalahan. Coba lagi.';
-        isLoading = false;
-      });
+      setState(() { usernameError = 'Terjadi kesalahan. Coba lagi.'; isLoading = false; });
+      _showNotif('Terjadi kesalahan. Coba lagi.', Colors.red);
     }
   }
 
@@ -225,13 +183,12 @@ class _LoginPageState extends State<LoginPage> {
                           ClipRRect(
                             borderRadius: BorderRadiusGeometry.circular(50),
                             child: Image.asset(
-                            'assets/images/logo.jpeg', 
-                            width: 120,
-                            height: 120,
-                            fit: BoxFit.cover,
+                              'assets/images/logo.jpeg',
+                              width: 120,
+                              height: 120,
+                              fit: BoxFit.cover,
+                            ),
                           ),
-                        ),
-                          
                           const SizedBox(height: 5),
                           Text(
                             'Selamat Datang!',
@@ -252,9 +209,7 @@ class _LoginPageState extends State<LoginPage> {
                             ),
                           ),
                           Text(
-                            isRegisterMode
-                                ? 'Buat akun baru'
-                                : 'Silakan masuk ke akun Anda',
+                            isRegisterMode ? 'Buat akun baru' : 'Silakan masuk ke akun Anda',
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               fontSize: 14,
@@ -264,13 +219,11 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                           const SizedBox(height: 25),
 
-                          // ── Username ──
+                          // Username
                           TextField(
                             controller: usernameController,
                             onChanged: (_) {
-                              if (usernameError != null) {
-                                setState(() => usernameError = null);
-                              }
+                              if (usernameError != null) setState(() => usernameError = null);
                             },
                             decoration: InputDecoration(
                               labelText: 'Username',
@@ -283,14 +236,12 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                           const SizedBox(height: 20),
 
-                          // ── Password ──
+                          // Password
                           TextField(
                             controller: passwordController,
                             obscureText: true,
                             onChanged: (_) {
-                              if (passwordError != null) {
-                                setState(() => passwordError = null);
-                              }
+                              if (passwordError != null) setState(() => passwordError = null);
                             },
                             decoration: InputDecoration(
                               labelText: 'Password',
@@ -302,7 +253,7 @@ class _LoginPageState extends State<LoginPage> {
                             ),
                           ),
 
-                          // ── Konfirmasi Password (hanya saat register) ──
+                          // Konfirmasi Password
                           if (isRegisterMode) ...[
                             const SizedBox(height: 20),
                             TextField(
@@ -326,16 +277,12 @@ class _LoginPageState extends State<LoginPage> {
 
                           const SizedBox(height: 25),
 
-                          // ── Tombol Login / Register ──
+                          // Tombol Login / Register
                           SizedBox(
                             width: double.infinity,
                             height: 50,
                             child: ElevatedButton(
-                              onPressed: isLoading
-                                  ? null
-                                  : isRegisterMode
-                                      ? register
-                                      : login,
+                              onPressed: isLoading ? null : (isRegisterMode ? register : login),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.blue,
                                 foregroundColor: Colors.white,
@@ -354,22 +301,16 @@ class _LoginPageState extends State<LoginPage> {
 
                           const SizedBox(height: 15),
 
-                          // ── Toggle Login/Register ──
+                          // Toggle Login/Register
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Text(
-                                isRegisterMode
-                                    ? 'Sudah punya akun? '
-                                    : 'Belum punya akun? ',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: Colors.grey[600],
-                                ),
+                                isRegisterMode ? 'Sudah punya akun? ' : 'Belum punya akun? ',
+                                style: TextStyle(fontSize: 13, color: Colors.grey[600]),
                               ),
                               GestureDetector(
                                 onTap: () {
-                                  // Tidak perlu clearSnackBars
                                   setState(() {
                                     isRegisterMode = !isRegisterMode;
                                     usernameError = null;

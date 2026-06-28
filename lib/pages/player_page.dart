@@ -45,9 +45,8 @@ class _PlayerPageState extends State<PlayerPage> {
   StreamSubscription? _positionSub;
   StreamSubscription? _playingSub;
   StreamSubscription? _completedSub;
-  StreamSubscription? _laguChangedSub; // ✅ tambah
+  StreamSubscription? _laguChangedSub; 
 
-  // ✅ Selalu ambil playlist dari AudioManager
   List<Map<String, dynamic>> get _playlist =>
       AudioManager.instance.currentPlaylist.isNotEmpty
           ? AudioManager.instance.currentPlaylist
@@ -62,7 +61,6 @@ class _PlayerPageState extends State<PlayerPage> {
     _coverUrl = widget.coverUrl;
     _currentIndex = widget.currentIndex;
 
-    // ✅ Simpan playlist ke AudioManager jika belum ada
     if (AudioManager.instance.currentPlaylist.isEmpty && widget.playlist.isNotEmpty) {
       AudioManager.instance.currentPlaylist = widget.playlist;
       AudioManager.instance.currentIndex = widget.currentIndex;
@@ -70,7 +68,6 @@ class _PlayerPageState extends State<PlayerPage> {
 
     _initPlayer();
 
-    // ✅ Sync UI saat lagu berganti dari mini player
     _laguChangedSub = AudioManager.instance.laguChangedStream.listen((_) {
       if (mounted) {
         setState(() {
@@ -88,7 +85,6 @@ class _PlayerPageState extends State<PlayerPage> {
     });
   }
 
-  // ✅ Pasang ulang stream listener tanpa stop/setUrl
   void _resubscribeStreams() {
     _durationSub?.cancel();
     _positionSub?.cancel();
@@ -183,7 +179,6 @@ class _PlayerPageState extends State<PlayerPage> {
       });
     }
 
-    // ✅ Pakai AudioManager.playLagu agar mini player ikut update
     await AudioManager.instance.playLagu(
       audioUrl: _audioUrl,
       judul: _judul,
@@ -203,7 +198,7 @@ class _PlayerPageState extends State<PlayerPage> {
     _positionSub?.cancel();
     _playingSub?.cancel();
     _completedSub?.cancel();
-    _laguChangedSub?.cancel(); // ✅ cancel
+    _laguChangedSub?.cancel();
     super.dispose();
   }
 
@@ -463,7 +458,6 @@ class _PlayerPageState extends State<PlayerPage> {
                                           icon: Icon(
                                             Icons.skip_next_rounded,
                                             size: 40,
-                                            // ✅ pakai _playlist bukan widget.playlist
                                             color: _playlist.isEmpty ||
                                                     _currentIndex == _playlist.length - 1
                                                 ? Colors.grey[400]

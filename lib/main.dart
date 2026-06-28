@@ -11,7 +11,6 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
 
-  // ✅ Tambah Firebase init di sini
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );

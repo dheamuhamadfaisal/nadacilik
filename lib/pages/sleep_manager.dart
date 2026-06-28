@@ -11,7 +11,6 @@ class SleepManager {
   int menitOtomatis = 30;
   bool _peringatanSudahTampil = false;
 
-  // ✅ Ganti jadi List supaya bisa didengarkan banyak halaman sekaligus
   final List<void Function()> _onTickListeners = [];
   final List<void Function()> _onWaktuHabisListeners = [];
   final List<void Function(int sisaDetik)> _onPeringatanListeners = [];

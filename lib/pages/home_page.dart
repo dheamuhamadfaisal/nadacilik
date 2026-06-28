@@ -31,7 +31,7 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   String username = '';
   Map<String, dynamic>? featuredLagu;
-  Map<String, dynamic>? _currentPlayingLagu; // ✅ Untuk mini player
+  Map<String, dynamic>? _currentPlayingLagu;
 
   @override
   void initState() {
@@ -40,7 +40,7 @@ class _HomePageState extends State<HomePage> {
     _fetchFeaturedLagu();
   }
 
-  // ✅ Update mini player setiap kembali ke halaman ini
+  // Update mini player setiap kembali ke halaman ini
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -57,7 +57,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _fetchFeaturedLagu() async {
-    final adaKoneksi = await cekKoneksi(); // ✅ Pakai connectivity_helper
+    final adaKoneksi = await cekKoneksi(); 
     if (!adaKoneksi) {
       if (mounted) {
         showTopNotif(
@@ -133,10 +133,10 @@ class _HomePageState extends State<HomePage> {
           coverUrl: featuredLagu!['cover_url'],
         ),
       ),
-    ).then((_) => setState(() {})); // ✅ Refresh mini player saat kembali
+    ).then((_) => setState(() {})); 
   }
 
-  // ✅ Widget mini player
+  // Widget mini player
   Widget MiniPlayerWid() {
     final isPlaying = AudioManager.instance.player.playing;
     final hasPosition = AudioManager.instance.player.position > Duration.zero;
@@ -162,7 +162,7 @@ class _HomePageState extends State<HomePage> {
               coverUrl: coverUrl,
             ),
           ),
-        ).then((_) => setState(() {})); // ✅ Refresh saat kembali
+        ).then((_) => setState(() {})); 
       },
       child: Container(
         height: 65,

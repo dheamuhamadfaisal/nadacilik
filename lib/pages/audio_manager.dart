@@ -13,7 +13,6 @@ class AudioManager {
   List<Map<String, dynamic>> currentPlaylist = [];
   int currentIndex = 0;
 
-  // ✅ Tambahkan StreamController ini
   final _laguChangedController = StreamController<void>.broadcast();
   Stream<void> get laguChangedStream => _laguChangedController.stream;
 
@@ -40,8 +39,6 @@ class AudioManager {
     await player.stop();
     await player.setUrl(audioUrl);
     player.play();
-
-    // ✅ Notify UI saat lagu berganti
     _laguChangedController.add(null);
   }
 

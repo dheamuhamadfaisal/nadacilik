@@ -29,7 +29,6 @@ class _CeritaPageState extends State<CeritaPage> {
     super.dispose();
   }
 
-  // ✅ Ganti isi fungsi ini dengan API call kamu
   Future<void> _fetchCerita() async {
     final adaKoneksi = await cekKoneksi();
     if (!adaKoneksi){
@@ -311,7 +310,6 @@ class _CeritaPageState extends State<CeritaPage> {
     );
   }
 
-  // Widget fallback cover jika tidak ada gambar
   Widget _coverFallback() {
     return Container(
       width: 80,

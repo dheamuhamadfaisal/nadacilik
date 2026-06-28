@@ -8,8 +8,6 @@ class MiniPlayerWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // ✅ Berlapis dua stream: laguChangedStream + playerStateStream
-    // agar UI rebuild saat next/previous dipanggil
     return StreamBuilder(
       stream: AudioManager.instance.laguChangedStream,
       builder: (context, _) {
@@ -39,7 +37,6 @@ class MiniPlayerWidget extends StatelessWidget {
                       artis: artis,
                       audioUrl: url,
                       coverUrl: coverUrl,
-                      // ✅ Kirim playlist agar next/previous di PlayerPage juga bekerja
                       playlist: AudioManager.instance.currentPlaylist,
                       currentIndex: currentIndex,
                     ),
@@ -129,7 +126,6 @@ class MiniPlayerWidget extends StatelessWidget {
                             icon: Icon(
                               Icons.skip_previous_rounded,
                               size: 26,
-                              // ✅ Abu-abu jika lagu pertama atau tidak ada playlist
                               color: currentIndex <= 0 && playlistLength > 0
                                   ? Colors.white.withOpacity(0.4)
                                   : Colors.white,
@@ -178,7 +174,6 @@ class MiniPlayerWidget extends StatelessWidget {
                             icon: Icon(
                               Icons.skip_next_rounded,
                               size: 26,
-                              // ✅ Abu-abu jika lagu terakhir
                               color: currentIndex >= playlistLength - 1
                                   ? Colors.white.withOpacity(0.4)
                                   : Colors.white,

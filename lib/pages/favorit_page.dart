@@ -154,7 +154,7 @@ class _FavoritPageState extends State<FavoritPage> {
         );
       }
     }
-  } // ✅ Tutup _onHapus
+  } 
 
   @override
   Widget build(BuildContext context) {
