@@ -166,19 +166,19 @@ Berikut beberapa kendala utama yang ditemukan selama pengembangan beserta solusi
 
 |Login|Registrasi|Edit Profil|
 |-|-|-|
-|!\[Login](screenshots/Login.jpg)|!\[Registrasi](screenshots/Registrasi.jpg)|!\[Edit Profil](screenshots/Edit\_Profil.jpg)|
+|![Login](screenshots/Login.jpg)|![Registrasi](screenshots/Registrasi.jpg)|![Edit Profil](screenshots/Edit_Profil.jpg)|
 
 |Favorit|Pengaturan Tidur|Edukasi|
 |-|-|-|
-|!\[Favorit](screenshots/Favorit.jpg)|!\[Pengaturan Tidur](screenshots/Pengaturan\_Tidur.jpg)|!\[Edukasi](screenshots/Edukasi.jpg)|
+|![Favorit](screenshots/Favorit.jpg)|![Pengaturan Tidur](screenshots/Pengaturan\_Tidur.jpg)|![Edukasi](screenshots/Edukasi.jpg)|
 
 |Musik|Player Edukasi|Player Musik|
 |-|-|-|
-|!\[Musik](screenshots/Musik.jpg)|!\[Player Edukasi](screenshots/Play\_Edukasi.jpg)|!\[Player Musik](screenshots/Play\_Musik.jpg)|
+|![Musik](screenshots/Musik.jpg)|![Player Edukasi](screenshots/Play_Edukasi.jpg)|![Player Musik](screenshots/Play_Musik.jpg)|
 
 |Beranda|
 |-|
-|!\[Beranda](screenshots/Beranda.jpg)|
+|![Beranda](screenshots/Beranda.jpg)|
 
 ## 
 
