@@ -1,8 +1,8 @@
-import 'package:projectuas/pages/mini_player_widget.dart';
-import 'package:projectuas/pages/connectivity_helper.dart';
-import 'package:projectuas/pages/snackbar_helper.dart';
-import 'package:projectuas/pages/audio_manager.dart';
-import 'package:projectuas/pages/sleep_manager.dart';
+import 'package:projectuas/mini_player_widget.dart';
+import 'package:projectuas/connection/connectivity_helper.dart';
+import 'package:projectuas/snackbar/snackbar_helper.dart';
+import 'package:projectuas/audio/audio_manager.dart';
+import 'package:projectuas/sleep/sleep_manager.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
@@ -30,7 +30,6 @@ class _SleepPageState extends State<SleepPage> {
       if (mounted) setState(() => _now = DateTime.now());
     });
 
-    //Pakai addOnTick / addOnWaktuHabis (list of listeners)
     SleepManager.instance.addOnTick(_onTick);
     SleepManager.instance.addOnWaktuHabis(_onWaktuHabisLokal);
   }
@@ -71,10 +70,12 @@ class _SleepPageState extends State<SleepPage> {
           context,
           message: 'Tidak ada koneksi internet!',
           backgroundColor: Colors.red,
-      );
+        );
+        setState(() {});
+      }
+      return;
     }
-    return;
-  }
+
     if (value) {
       SleepManager.instance.mulai(_menitOtomatis);
       setState(() {});
@@ -124,17 +125,34 @@ class _SleepPageState extends State<SleepPage> {
       context: context,
       builder: (context) => SimpleDialog(
         title: const Text('Matikan otomatis setelah'),
-        children: [15, 30, 45, 60].map((menit) {
-          return SimpleDialogOption(
-            onPressed: () => Navigator.pop(context, menit),
-            child: Text('$menit menit'),
-          );
-        }).toList(),
+        children: [
+          ...[15, 30, 45, 60].map((menit) {
+            return SimpleDialogOption(
+              onPressed: () => Navigator.pop(context, menit),
+              child: Text('$menit menit'),
+            );
+          }),
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(context, -10),
+            child: const Text('10 detik (testing)'),
+          ),
+        ],
       ),
     );
+
     if (pilihan != null) {
-      SleepManager.instance.menitOtomatis = pilihan;
-      setState(() {});
+      if (pilihan == -10) {
+        SleepManager.instance.mulaiDenganDetik(10);
+        setState(() {});
+        showTopNotif(
+          context,
+          message: 'Waktu tidur aktif — tutup otomatis 10 detik lagi (testing)',
+          backgroundColor: Colors.indigo,
+        );
+      } else {
+        SleepManager.instance.menitOtomatis = pilihan;
+        setState(() {});
+      }
     }
   }
 
@@ -157,8 +175,6 @@ class _SleepPageState extends State<SleepPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-
-                // ── AppBar ──
                 Padding(
                   padding: const EdgeInsets.fromLTRB(8, 8, 16, 0),
                   child: Row(
@@ -186,16 +202,12 @@ class _SleepPageState extends State<SleepPage> {
                     ],
                   ),
                 ),
-
                 const SizedBox(height: 20),
-
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Column(
                       children: [
-
-                        // ── Kotak Jam + Countdown ──
                         Container(
                           width: double.infinity,
                           padding: const EdgeInsets.symmetric(
@@ -236,7 +248,6 @@ class _SleepPageState extends State<SleepPage> {
                                   letterSpacing: 1,
                                 ),
                               ),
-
                               if (_waktuTidurAktif) ...[
                                 const SizedBox(height: 16),
                                 Container(
@@ -268,10 +279,7 @@ class _SleepPageState extends State<SleepPage> {
                             ],
                           ),
                         ),
-
                         const SizedBox(height: 20),
-
-                        // ── Card Toggle ──
                         Container(
                           decoration: BoxDecoration(
                             color: Colors.white.withOpacity(0.95),
@@ -330,9 +338,7 @@ class _SleepPageState extends State<SleepPage> {
                             ),
                           ),
                         ),
-
                         const Spacer(),
-
                         Center(
                           child: Text(
                             '© 2026 Nada Cilik',

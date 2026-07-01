@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'audio_manager.dart';
-import 'player_page.dart';
+import 'package:projectuas/audio/audio_manager.dart';
+import 'package:projectuas/pages/player_page.dart';
 
 class MiniPlayerWidget extends StatelessWidget {
   const MiniPlayerWidget({super.key});

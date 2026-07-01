@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'snackbar_helper.dart';
+import 'package:projectuas/snackbar/snackbar_helper.dart';
 
 class EditProfilPage extends StatefulWidget {
   const EditProfilPage({super.key});

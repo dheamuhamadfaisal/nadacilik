@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:projectuas/pages/snackbar_helper.dart';
+import 'package:projectuas/snackbar/snackbar_helper.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:projectuas/pages/audio_manager.dart';
+import 'package:projectuas/audio/audio_manager.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:projectuas/pages/connectivity_helper.dart';
-import 'mini_player_widget.dart';
+import 'package:projectuas/connection/connectivity_helper.dart';
+import 'package:projectuas/mini_player_widget.dart';
 import 'login_page.dart';
 import 'favorit_page.dart';
 import 'sleep_page.dart';

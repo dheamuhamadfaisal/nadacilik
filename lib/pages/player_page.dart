@@ -1,9 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:projectuas/pages/snackbar_helper.dart';
-import 'audio_manager.dart';
+import 'package:projectuas/snackbar/snackbar_helper.dart';
+import 'package:projectuas/audio/audio_manager.dart';
 
 class PlayerPage extends StatefulWidget {
   final String judul;

@@ -1,10 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:projectuas/pages/snackbar_helper.dart';
+import 'package:projectuas/snackbar/snackbar_helper.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'mini_player_widget.dart';
-import 'audio_manager.dart';
+import 'package:projectuas/mini_player_widget.dart';
+import 'package:projectuas/audio/audio_manager.dart';
 
 class EdukasiPage extends StatefulWidget {
   const EdukasiPage({super.key});
